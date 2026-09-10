@@ -1,0 +1,19 @@
+{
+  "dl212223": {
+    "judge_acc": 0.6128988180638109,
+    "rho_glob_probe_vs_trunc": 0.4365562425971624,
+    "err_in_glob_probe_vs_trunc": 0.41744658308317145,
+    "err_out_glob_probe_vs_trunc": 0.3679518609315801,
+    "band_frac_glob_probe_vs_trunc": 0.3868962219033955,
+    "rho_glob_probe_vs_ad_probe": 0.4170679776002671,
+    "err_in_glob_probe_vs_ad_probe": 0.40522422561257515,
+    "err_out_glob_probe_vs_ad_probe": 0.37949762389680924,
+    "band_frac_glob_probe_vs_ad_probe": 0.29555236728837875,
+    "rho_trunc_vs_ad_probe": 0.4675813973712772,
+    "err_in_trunc_vs_ad_probe": 0.4263479710950528,
+    "err_out_trunc_vs_ad_probe": 0.38160149556005607,
+    "band_frac_trunc_vs_ad_probe": 0.12290769966523195,
+    "n_queries": 211,
+    "c_star": 6.477469044957775
+  }
+}

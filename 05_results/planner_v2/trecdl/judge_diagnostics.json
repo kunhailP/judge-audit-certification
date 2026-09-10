@@ -1,0 +1,19 @@
+{
+  "dl1920": {
+    "judge_acc": 0.6784849365494526,
+    "rho_glob_probe_vs_trunc": -0.13021292409973156,
+    "err_in_glob_probe_vs_trunc": 0.5400552486187845,
+    "err_out_glob_probe_vs_trunc": 0.3135729344443329,
+    "band_frac_glob_probe_vs_trunc": 0.035067325389906034,
+    "rho_glob_probe_vs_ad_probe": 0.03003884244874933,
+    "err_in_glob_probe_vs_ad_probe": 0.5509259259259259,
+    "err_out_glob_probe_vs_ad_probe": 0.3140814081408141,
+    "band_frac_glob_probe_vs_ad_probe": 0.03138622493461203,
+    "rho_trunc_vs_ad_probe": -0.1459138361183929,
+    "err_in_trunc_vs_ad_probe": 0.5741127348643006,
+    "err_out_trunc_vs_ad_probe": 0.30922389272653394,
+    "band_frac_trunc_vs_ad_probe": 0.04640123994962705,
+    "n_queries": 97,
+    "c_star": 5.57913948045385
+  }
+}

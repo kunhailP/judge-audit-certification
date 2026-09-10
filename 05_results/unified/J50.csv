@@ -1,0 +1,119 @@
+block,collection,judge,method,eps,J50_docs,J50_queries,wrong_rate,n,max_budget_docs,max_act
+"A query-level, set-F1, eps=0.01",dbpedia-entity,—,split_t,0.01,,,0.002,500,9796.666666666668,0.316
+"A query-level, set-F1, eps=0.01",dbpedia-entity,Qwen3-8B,split_ppi,0.01,,,0.0,500,9796.666666666668,0.444
+"A query-level, set-F1, eps=0.01",dbpedia-entity,Qwen3-8B,split_auto,0.01,,,0.002,500,9796.666666666668,0.434
+"A query-level, set-F1, eps=0.01",dbpedia-entity,Mistral-7B,split_ppi,0.01,,,0.002,500,9796.666666666668,0.47
+"A query-level, set-F1, eps=0.01",dbpedia-entity,Mistral-7B,split_auto,0.01,,,0.002,500,9796.666666666668,0.432
+"A query-level, set-F1, eps=0.01",dbpedia-entity,Qwen3-Reranker,split_ppi,0.01,,,0.002,500,9796.666666666668,0.432
+"A query-level, set-F1, eps=0.01",dbpedia-entity,Qwen3-Reranker,split_auto,0.01,,,0.004,500,9796.666666666668,0.358
+"A query-level, set-F1, eps=0.01",dbpedia-entity,inverted,split_ppi,0.01,,,0.004,500,9796.666666666668,0.312
+"A query-level, set-F1, eps=0.01",dbpedia-entity,inverted,split_auto,0.01,,,0.002,500,9796.666666666668,0.316
+"A query-level, set-F1, eps=0.01",dl212223,—,split_t,0.01,5483.219864001649,79.04347826086956,0.0,500,13180.236966824645,0.626
+"A query-level, set-F1, eps=0.01",dl212223,Qwen3-8B,split_ppi,0.01,5280.58903182126,76.12244897959184,0.0,500,13180.236966824645,0.636
+"A query-level, set-F1, eps=0.01",dl212223,Qwen3-8B,split_auto,0.01,5476.900473933649,78.95238095238095,0.0,500,13180.236966824645,0.616
+"A query-level, set-F1, eps=0.01",dl212223,Qwen3-Reranker,split_ppi,0.01,6173.90047393365,89.0,0.0,500,13180.236966824645,0.512
+"A query-level, set-F1, eps=0.01",dl212223,Qwen3-Reranker,split_auto,0.01,5531.477024520915,79.73913043478261,0.0,500,13180.236966824645,0.618
+"A query-level, set-F1, eps=0.01",dl212223,Mistral-7B,split_ppi,0.01,5508.767772511848,79.41176470588235,0.0,500,13180.236966824645,0.608
+"A query-level, set-F1, eps=0.01",dl212223,Mistral-7B,split_auto,0.01,5531.156733632512,79.73451327433628,0.0,500,13180.236966824645,0.616
+"B doc-level, precision",dl212223,—,uniform,0.01,,,0.0,300,3631.115686666667,0.4533333333333333
+"B doc-level, precision",dl212223,—,weighted,0.01,1598.3116056695158,,0.0,300,3631.115686666667,0.8466666666666667
+"B doc-level, precision",dl212223,—,strat_pilot,0.01,1522.323415028637,,0.0,300,3631.115686666667,0.85
+"B doc-level, precision",dl212223,Qwen3-8B,weighted_cv,0.01,1591.5913902187228,,0.0,300,3631.115686666667,0.8533333333333334
+"B doc-level, precision",dl212223,—,uniform,0.02,3206.8616201832765,,0.0033333333333333,300,3631.115686666667,0.6133333333333333
+"B doc-level, precision",dl212223,—,weighted,0.02,1272.977338429119,,0.0,300,3631.115686666667,0.8866666666666667
+"B doc-level, precision",dl212223,—,strat_pilot,0.02,1387.6485873288443,,0.0033333333333333,300,3631.115686666667,0.89
+"B doc-level, precision",dl212223,Qwen3-8B,weighted_cv,0.02,1255.7608416388891,,0.0,300,3631.115686666667,0.8933333333333333
+"B doc-level, precision",dbpedia-entity,—,uniform,0.01,,,0.0,300,2572.807653333333,0.15
+"B doc-level, precision",dbpedia-entity,—,weighted,0.01,,,0.0,300,2572.807653333333,0.36
+"B doc-level, precision",dbpedia-entity,—,strat_pilot,0.01,,,0.0,300,2572.807653333333,0.3666666666666666
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,weighted_cv,0.01,,,0.0,300,2572.807653333333,0.41
+"B doc-level, precision",dbpedia-entity,—,uniform,0.02,,,0.0,300,2572.807653333333,0.3
+"B doc-level, precision",dbpedia-entity,—,weighted,0.02,1990.2851657861631,,0.0,300,2572.807653333333,0.62
+"B doc-level, precision",dbpedia-entity,—,strat_pilot,0.02,2144.0063777777773,,0.0,300,2572.807653333333,0.6066666666666667
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,weighted_cv,0.02,1705.2329795348833,,0.0,300,2572.807653333333,0.6266666666666667
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,weighted_cv,0.01,,,0.0,300,2572.807653333333,0.4366666666666666
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,weighted_cv,0.02,1568.7851544715445,,0.0,300,2572.807653333333,0.6666666666666666
+"B doc-level, precision",dl212223,—,uniform,0.0265861701992643,,,0.03,300,2420.7437911111115,0.03
+"B doc-level, precision",dl212223,—,weighted,0.0265861701992643,,,0.0,300,2420.7437911111115,0.0
+"B doc-level, precision",dl212223,—,strat_pilot,0.0265861701992643,,,0.0033333333333333,300,2420.7437911111115,0.0033333333333333
+"B doc-level, precision",dl212223,Qwen3-8B,weighted_cv,0.0265861701992643,,,0.0,300,2420.7437911111115,0.0
+"B doc-level, precision",dl212223,—,uniform,0.0390712013741052,,,0.0133333333333333,300,3631.115686666667,0.0133333333333333
+"B doc-level, precision",dl212223,—,weighted,0.0390712013741052,,,0.0,300,3631.115686666667,0.0
+"B doc-level, precision",dl212223,—,strat_pilot,0.0390712013741052,,,0.0,300,3631.115686666667,0.0
+"B doc-level, precision",dl212223,Qwen3-8B,weighted_cv,0.0390712013741052,,,0.0,300,3631.115686666667,0.0
+"B doc-level, precision",dbpedia-entity,—,uniform,0.0138365041741949,,,0.0,300,1715.2051022222217,0.0
+"B doc-level, precision",dbpedia-entity,—,weighted,0.0138365041741949,,,0.01,300,1715.2051022222217,0.01
+"B doc-level, precision",dbpedia-entity,—,strat_pilot,0.0138365041741949,,,0.0033333333333333,300,1715.2051022222217,0.0033333333333333
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,weighted_cv,0.0138365041741949,,,0.0,300,1715.2051022222217,0.0
+"B doc-level, precision",dbpedia-entity,—,uniform,0.0169009546669507,,,0.02,300,2572.807653333333,0.02
+"B doc-level, precision",dbpedia-entity,—,weighted,0.0169009546669507,,,0.0,300,2572.807653333333,0.0
+"B doc-level, precision",dbpedia-entity,—,strat_pilot,0.0169009546669507,,,0.0,300,2572.807653333333,0.0
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,weighted_cv,0.0169009546669507,,,0.0,300,2572.807653333333,0.0
+"B doc-level, precision",dl212223,Qwen3-8B,ai_calib,0.01,1785.8918655010893,,0.0,300,3631.115686666667,0.8733333333333333
+"B doc-level, precision",dl212223,Qwen3-8B,ai_resid,0.01,1532.1771217548503,,0.0,300,3631.115686666667,0.88
+"B doc-level, precision",dl212223,Qwen3-8B,ai_robust_0.5,0.01,1569.0006053497946,,0.0,300,3631.115686666667,0.8766666666666667
+"B doc-level, precision",dl212223,Qwen3-8B,ai_calib,0.02,1561.6336694405597,,0.0,300,3631.115686666667,0.8433333333333334
+"B doc-level, precision",dl212223,Qwen3-8B,ai_resid,0.02,1339.685132260209,,0.0,300,3631.115686666667,0.86
+"B doc-level, precision",dl212223,Qwen3-8B,ai_robust_0.5,0.02,1311.2362201851854,,0.0,300,3631.115686666667,0.8666666666666667
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,ai_calib,0.01,,,0.0,300,2572.807653333333,0.4166666666666667
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,ai_resid,0.01,,,0.0,300,2572.807653333333,0.4866666666666667
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,ai_robust_0.5,0.01,,,0.0,300,2572.807653333333,0.4633333333333333
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,ai_calib,0.02,2019.5156848745514,,0.0,300,2572.807653333333,0.6133333333333333
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,ai_resid,0.02,1610.0274308595385,,0.0,300,2572.807653333333,0.7066666666666667
+"B doc-level, precision",dbpedia-entity,Qwen3-8B,ai_robust_0.5,0.02,1556.3898149794236,,0.0,300,2572.807653333333,0.6933333333333334
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,ai_calib,0.01,,,0.0033333333333333,300,2572.807653333333,0.3933333333333333
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,ai_resid,0.01,,,0.0,300,2572.807653333333,0.45
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,ai_robust_0.5,0.01,,,0.0,300,2572.807653333333,0.44
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,ai_calib,0.02,2053.7324250292395,,0.0,300,2572.807653333333,0.6033333333333334
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,ai_resid,0.02,1715.2051022222217,,0.0,300,2572.807653333333,0.6533333333333333
+"B doc-level, precision",dbpedia-entity,Qwen3-Reranker,ai_robust_0.5,0.02,1628.1048431249997,,0.0,300,2572.807653333333,0.64
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,static_sum,0.01,2519.207493888889,,0.0,300,2572.807653333333,0.5033333333333333
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,per_pair,0.01,,,0.0,300,2572.807653333333,0.4233333333333333
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,adaptive,0.01,2522.3604444444445,,0.0,300,2572.807653333333,0.5033333333333333
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,oracle,0.01,2315.5268879999994,,0.0,300,2572.807653333333,0.52
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,static_sum,0.02,1524.6267575308636,,0.0,300,2572.807653333333,0.64
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,per_pair,0.02,1871.132838787878,,0.0,300,2572.807653333333,0.56
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,adaptive,0.02,1462.9690577777774,,0.0,300,2572.807653333333,0.6366666666666667
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-8B,oracle,0.02,1244.9069290322577,,0.0,300,2572.807653333333,0.6266666666666667
+"C 4-policy menu, precision",dl212223,Qwen3-8B,static_sum,0.01,1926.5086004259263,,0.0,300,3631.115686666667,0.8366666666666667
+"C 4-policy menu, precision",dl212223,Qwen3-8B,per_pair,0.01,2789.1178462801936,,0.0,300,3631.115686666667,0.5533333333333333
+"C 4-policy menu, precision",dl212223,Qwen3-8B,adaptive,0.01,1873.5893725722985,,0.0,300,3631.115686666667,0.84
+"C 4-policy menu, precision",dl212223,Qwen3-8B,oracle,0.01,1762.47135668616,,0.0,300,3631.115686666667,0.8466666666666667
+"C 4-policy menu, precision",dl212223,Qwen3-8B,static_sum,0.02,1561.9137328676472,,0.0,300,3631.115686666667,0.8433333333333334
+"C 4-policy menu, precision",dl212223,Qwen3-8B,per_pair,0.02,1633.04144638448,,0.0,300,3631.115686666667,0.7333333333333333
+"C 4-policy menu, precision",dl212223,Qwen3-8B,adaptive,0.02,1560.30934835223,,0.0,300,3631.115686666667,0.8466666666666667
+"C 4-policy menu, precision",dl212223,Qwen3-8B,oracle,0.02,1540.0627477031512,,0.0,300,3631.115686666667,0.8433333333333334
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,static_sum,0.01,,,0.0,300,2572.807653333333,0.4633333333333333
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,per_pair,0.01,,,0.0,300,2572.807653333333,0.4066666666666667
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,adaptive,0.01,,,0.0,300,2572.807653333333,0.46
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,oracle,0.01,,,0.0,300,2572.807653333333,0.4833333333333333
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,static_sum,0.02,1865.285548666666,,0.0,300,2572.807653333333,0.61
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,per_pair,0.02,1943.8991158518518,,0.0,300,2572.807653333333,0.5733333333333334
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,adaptive,0.02,1810.4942745679007,,0.0,300,2572.807653333333,0.6066666666666667
+"C 4-policy menu, precision",dbpedia-entity,Qwen3-Reranker,oracle,0.02,1740.4287066666668,,0.0,300,2572.807653333333,0.61
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,—,human_full,0.01,4881.023049426845,,0.0,300,6170.827067669173,0.67
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,—,weighted_plugin,0.01,1675.4127253617917,,0.0,300,6170.827067669173,0.81
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-8B,judge_ppi,0.01,4163.194973735709,,0.0,300,6170.827067669173,0.7533333333333333
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-8B,weighted_lin_cv,0.01,2926.9162632608914,,0.0,300,6170.827067669173,0.8066666666666666
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-8B,weighted_lin_cv_bc,0.01,,,0.0,300,6170.827067669173,0.4966666666666666
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,—,human_full,0.02,3680.192046381013,,0.0,300,6170.827067669173,0.81
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,—,weighted_plugin,0.02,1542.7067669172932,,0.0,300,6170.827067669173,0.8733333333333333
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-8B,judge_ppi,0.02,2962.444153862918,,0.0,300,6170.827067669173,0.8233333333333334
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-8B,weighted_lin_cv,0.02,2455.5510076967566,,0.0,300,6170.827067669173,0.8733333333333333
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-8B,weighted_lin_cv_bc,0.02,3143.628883529579,,0.0,300,6170.827067669173,0.6766666666666666
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,—,human_full,0.01,3464.6080118615796,,0.0,300,8324.36018957346,0.9433333333333334
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,—,weighted_plugin,0.01,2081.090047393365,,0.0,300,8324.36018957346,0.9666666666666668
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,Qwen3-8B,judge_ppi,0.01,3555.1954976303314,,0.0,300,8324.36018957346,0.9266666666666666
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,Qwen3-8B,weighted_lin_cv,0.01,2081.090047393365,,0.0,300,8324.36018957346,0.9666666666666668
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,Qwen3-8B,weighted_lin_cv_bc,0.01,2520.219139962607,,0.0,300,8324.36018957346,0.8266666666666667
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,—,human_full,0.02,3167.3175355450235,,0.0,300,8324.36018957346,0.9666666666666668
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,—,weighted_plugin,0.02,2081.090047393365,,0.0,300,8324.36018957346,0.9733333333333334
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,Qwen3-8B,judge_ppi,0.02,3137.165593831789,,0.0,300,8324.36018957346,0.9633333333333334
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,Qwen3-8B,weighted_lin_cv,0.02,2081.090047393365,,0.0,300,8324.36018957346,0.9733333333333334
+"D doc-level, set-F1 (linearised; see caveat)",dl212223,Qwen3-8B,weighted_lin_cv_bc,0.02,2081.090047393365,,0.0,300,8324.36018957346,0.91
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-Reranker,judge_ppi,0.01,5044.406253729562,,0.0,300,6170.827067669173,0.6533333333333333
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-Reranker,weighted_lin_cv,0.01,2232.8650573802925,,0.0,300,6170.827067669173,0.82
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-Reranker,weighted_lin_cv_bc,0.01,5898.584697036709,,0.0,300,6170.827067669173,0.51
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-Reranker,judge_ppi,0.02,3471.09022556391,,0.0,300,6170.827067669173,0.8066666666666666
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-Reranker,weighted_lin_cv,0.02,1633.454223794781,,0.0,300,6170.827067669173,0.8733333333333333
+"D doc-level, set-F1 (linearised; see caveat)",dbpedia-entity,Qwen3-Reranker,weighted_lin_cv_bc,0.02,2875.725235418644,,0.0,300,6170.827067669173,0.6733333333333333

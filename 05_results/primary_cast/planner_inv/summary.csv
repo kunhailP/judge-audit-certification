@@ -1,0 +1,11 @@
+collection,method,act_rate,mean_T,wrong_cert_rate
+cast19,loo_boot,0.874,48.56,0.082
+cast19,loo_sim,0.732,55.8,0.048
+cast19,recal_bp,0.008,69.96,0.0
+cast19,recal_bpu,0.0,70.0,0.0
+cast19,recal_bpx,0.004,70.0,0.0
+cast19,recal_bpxu,0.0,70.0,0.0
+cast19,recal_ep,0.04,69.32,0.006
+cast19,split_auto,0.096,69.36,0.0
+cast19,split_ppi,0.084,69.4,0.0
+cast19,split_t,0.096,69.36,0.0

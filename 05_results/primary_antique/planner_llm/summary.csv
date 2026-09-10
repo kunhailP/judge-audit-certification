@@ -1,0 +1,11 @@
+collection,method,act_rate,mean_T,wrong_cert_rate
+antique,loo_boot,0.916,51.24,0.146
+antique,loo_sim,0.844,61.64,0.14
+antique,recal_bp,0.626,80.56,0.0
+antique,recal_bpu,0.0,90.0,0.0
+antique,recal_bpx,0.51,83.8,0.0
+antique,recal_bpxu,0.0,90.0,0.0
+antique,recal_ep,0.798,65.16,0.02
+antique,split_auto,0.232,85.68,0.008
+antique,split_ppi,0.292,84.6,0.012
+antique,split_t,0.222,85.84,0.01

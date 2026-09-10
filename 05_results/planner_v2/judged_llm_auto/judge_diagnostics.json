@@ -1,0 +1,53 @@
+{
+  "trec-covid": {
+    "judge_acc": 0.7594237695078031,
+    "rho_glob_probe_vs_trunc": 0.8321064443621883,
+    "err_in_glob_probe_vs_trunc": 0.25865703101475457,
+    "err_out_glob_probe_vs_trunc": 0.16943127962085308,
+    "band_frac_glob_probe_vs_trunc": 0.797358943577431,
+    "rho_glob_probe_vs_ad_probe": 0.7317255822837736,
+    "err_in_glob_probe_vs_ad_probe": 0.29336734693877553,
+    "err_out_glob_probe_vs_ad_probe": 0.23509143917307182,
+    "band_frac_glob_probe_vs_ad_probe": 0.09411764705882353,
+    "rho_trunc_vs_ad_probe": 0.8359810801359576,
+    "err_in_trunc_vs_ad_probe": 0.25401160805735745,
+    "err_out_trunc_vs_ad_probe": 0.2087378640776699,
+    "band_frac_trunc_vs_ad_probe": 0.7032412965186075,
+    "n_queries": 50,
+    "c_star": 10.120165210666746
+  },
+  "webis-touche2020": {
+    "judge_acc": 0.7868675995694295,
+    "rho_glob_probe_vs_trunc": 0.8059516185410986,
+    "err_in_glob_probe_vs_trunc": 0.2604166666666667,
+    "err_out_glob_probe_vs_trunc": 0.20768307322929172,
+    "band_frac_glob_probe_vs_trunc": 0.10333692142088267,
+    "rho_glob_probe_vs_ad_probe": 0.6898444372597287,
+    "err_in_glob_probe_vs_ad_probe": 0.18518518518518517,
+    "err_out_glob_probe_vs_ad_probe": 0.2139689578713969,
+    "band_frac_glob_probe_vs_ad_probe": 0.02906350914962325,
+    "rho_trunc_vs_ad_probe": 0.7326428144172166,
+    "err_in_trunc_vs_ad_probe": 0.25,
+    "err_out_trunc_vs_ad_probe": 0.20908004778972522,
+    "band_frac_trunc_vs_ad_probe": 0.09903121636167922,
+    "n_queries": 49,
+    "c_star": 3.4735887146031246
+  },
+  "dbpedia-entity": {
+    "judge_acc": 0.759928061050892,
+    "rho_glob_probe_vs_trunc": 0.6352478929955654,
+    "err_in_glob_probe_vs_trunc": 0.255044390637611,
+    "err_out_glob_probe_vs_trunc": 0.23022372308991135,
+    "band_frac_glob_probe_vs_trunc": 0.4227020177405205,
+    "rho_glob_probe_vs_ad_probe": 0.5342616662509991,
+    "err_in_glob_probe_vs_ad_probe": 0.2459071729957806,
+    "err_out_glob_probe_vs_ad_probe": 0.23860755156581923,
+    "band_frac_glob_probe_vs_ad_probe": 0.28877083536407055,
+    "rho_trunc_vs_ad_probe": 0.5668990947251701,
+    "err_in_trunc_vs_ad_probe": 0.2960224375318715,
+    "err_out_trunc_vs_ad_probe": 0.22764521571463003,
+    "band_frac_trunc_vs_ad_probe": 0.1911492348182084,
+    "n_queries": 399,
+    "c_star": 3.6554923417604295
+  }
+}

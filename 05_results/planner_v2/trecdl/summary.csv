@@ -1,0 +1,10 @@
+collection,method,act_rate,mean_T,wrong_cert_rate
+dl1920,loo_boot,0.36,26.8,0.08
+dl1920,loo_sim,0.28,27.6,0.02
+dl1920,recal_bp,0.0,30.0,0.0
+dl1920,recal_bpu,0.0,30.0,0.0
+dl1920,recal_bpx,0.0,30.0,0.0
+dl1920,recal_bpxu,0.0,30.0,0.0
+dl1920,recal_ep,0.08,29.6,0.06
+dl1920,split_ppi,0.0,30.0,0.0
+dl1920,split_t,0.0,30.0,0.0

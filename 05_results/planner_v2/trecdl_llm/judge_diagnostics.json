@@ -1,0 +1,36 @@
+{
+  "dl2019": {
+    "judge_acc": 0.7477321814254859,
+    "rho_glob_probe_vs_trunc": 0.8836148771585689,
+    "err_in_glob_probe_vs_trunc": 0.27074235807860264,
+    "err_out_glob_probe_vs_trunc": 0.24536418928942294,
+    "band_frac_glob_probe_vs_trunc": 0.27203023758099354,
+    "rho_glob_probe_vs_ad_probe": 0.5537764889176363,
+    "err_in_glob_probe_vs_ad_probe": 0.2823529411764706,
+    "err_out_glob_probe_vs_ad_probe": 0.24955856386109476,
+    "band_frac_glob_probe_vs_ad_probe": 0.0826133909287257,
+    "rho_trunc_vs_ad_probe": 0.8663320294744029,
+    "err_in_trunc_vs_ad_probe": 0.2780586450960566,
+    "err_out_trunc_vs_ad_probe": 0.24526229057951113,
+    "band_frac_trunc_vs_ad_probe": 0.21360691144708424,
+    "n_queries": 43,
+    "c_star": 1.1003303629169527
+  },
+  "dl2020": {
+    "judge_acc": 0.7674336904971018,
+    "rho_glob_probe_vs_trunc": 0.5592102054101025,
+    "err_in_glob_probe_vs_trunc": 0.31112212038642556,
+    "err_out_glob_probe_vs_trunc": 0.18941352564974825,
+    "band_frac_glob_probe_vs_trunc": 0.35455822940453185,
+    "rho_glob_probe_vs_ad_probe": 0.48403786189994363,
+    "err_in_glob_probe_vs_ad_probe": 0.3504923903312444,
+    "err_out_glob_probe_vs_ad_probe": 0.2037805944055944,
+    "band_frac_glob_probe_vs_ad_probe": 0.19620586685403127,
+    "rho_trunc_vs_ad_probe": 0.7453853206093162,
+    "err_in_trunc_vs_ad_probe": 0.27156234598324297,
+    "err_out_trunc_vs_ad_probe": 0.22411029176017955,
+    "band_frac_trunc_vs_ad_probe": 0.17820129984191113,
+    "n_queries": 54,
+    "c_star": 0.4168307815307213
+  }
+}

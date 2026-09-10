@@ -1,0 +1,127 @@
+{
+ "P1_validity": {
+  "pass_": true,
+  "cells": {
+   "active_cv@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "active_cv@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "active_judge@60": {
+    "type1": 0.0033333333333333,
+    "cp_hi": 0.018431252048067885
+   },
+   "active_judge@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "strat_pilot@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "strat_pilot@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "uniform@60": {
+    "type1": 0.0133333333333333,
+    "cp_hi": 0.03378489626191785
+   },
+   "uniform@90": {
+    "type1": 0.0033333333333333,
+    "cp_hi": 0.018431252048067885
+   },
+   "weighted@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "weighted@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "weighted_cv@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "weighted_cv@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_calib@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_calib@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_resid@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_resid@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_robust_0.3@60": {
+    "type1": 0.0033333333333333,
+    "cp_hi": 0.018431252048067885
+   },
+   "ai_robust_0.3@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_robust_0.5@60": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   },
+   "ai_robust_0.5@90": {
+    "type1": 0.0,
+    "cp_hi": 0.01222097469429355
+   }
+  }
+ },
+ "P2_unconditional_gain": {
+  "pass_": false,
+  "J50_weighted": NaN,
+  "J50_uniform": NaN
+ },
+ "P3_judge_never_hurts": {
+  "pass_": true,
+  "by_judge": {
+   "llm": {
+    "J50_cv": NaN,
+    "J50_weighted": NaN,
+    "pass_": true
+   },
+   "rr": {
+    "J50_cv": NaN,
+    "J50_weighted": NaN,
+    "pass_": true
+   },
+   "inv": {
+    "J50_cv": NaN,
+    "J50_weighted": NaN,
+    "pass_": true
+   }
+  }
+ },
+ "P4_active_equivalence": {
+  "pass_": false,
+  "J50_ai_resid": NaN,
+  "J50_weighted_cv": NaN
+ },
+ "S1_conditional_judge_gain": {
+  "rho_mean": 0.6188681119531831,
+  "expect_gain": true,
+  "J50_ratio_cv_over_weighted": NaN
+ },
+ "S2_calibrated_rule_worse": {
+  "pass_": null,
+  "J50_calib": NaN,
+  "J50_resid": NaN
+ }
+}
