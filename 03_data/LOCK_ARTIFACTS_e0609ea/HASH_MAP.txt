@@ -1,0 +1,7 @@
+History rewrite 2026-09-14 (author request: single-author attribution; only auto-inserted "Co-authored-by" trailers were
+removed from commit messages; trees, author/committer identities and dates are unchanged, verified with git log).
+  e0609ea (Initial release, 2026-09-10 16:04:08 UTC)  ->  6aa813a
+  978856e (featured-prep, 2026-09-14)                  ->  d9aeef3
+  9aa624e (featured-prep, 2026-09-14)                  ->  d678bc7
+Tag lock-e0609ea-2026-09-14 now points to 6aa813a. Directory name and ARCHIVE_SHA256.txt keep the historical hash; the
+content hashes (SHA256SUMS, archive sha) are of file contents and are unaffected.

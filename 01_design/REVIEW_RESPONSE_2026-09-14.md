@@ -418,3 +418,8 @@ arm `split_fp`(humans) / `split_fp_ppi`(rectifier D−λD̂, λ는 train에서�
 1. 원고 전체 통독(숫자 ↔ CSV 대조는 §12.1·부록 표에 대해 완료; §3·§6 legacy 수치는 불변).
 2. `git commit` (featured-prep) — 작업 트리 114개 변경 파일; 커밋 메시지에 §11–12 참조.
 3. 남은 판단: eps=0.01 셀(cast/dbpedia n.r.)을 표에 넣을지(현재 본문에서 문장으로만 언급).
+
+### 12.9 저장소 이력 정리 (사용자 요청, 2026-09-14 23:05 KST)
+자동 삽입된 `Co-authored-by` trailer(Cursor / Claude)를 세 커밋 메시지에서 제거해 단일 저자로 정리. 트리·저자·날짜 불변.
+해시 변경: e0609ea→6aa813a, 978856e→d9aeef3, 9aa624e→d678bc7 (`03_data/LOCK_ARTIFACTS_e0609ea/HASH_MAP.txt`). 태그 `lock-e0609ea-2026-09-14`는
+6aa813a로 이동. 로컬 `commit-msg` hook이 이후 커밋에서도 trailer를 제거. 백업 브랜치 `backup/main-e0609ea`, `backup/featured-prep-9aa624e`는 로컬에만.
