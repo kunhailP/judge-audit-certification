@@ -89,6 +89,7 @@ def main():
     ap.add_argument("--train_dir", default=None); ap.add_argument("--train_names", nargs="+", default=["nfcorpus", "scifact", "arguana", "cqadupstack-android"])
     ap.add_argument("--budget_full", nargs="+", type=int, default=[30, 45, 60, 90]); ap.add_argument("--eps", nargs="+", type=float, default=[0.01, 0.02])
     ap.add_argument("--rounds", type=int, default=3); ap.add_argument("--n_train", type=int, default=20); ap.add_argument("--draws", type=int, default=300)
+    ap.add_argument("--fixed_cand", default="pilot", help="pilot (default: chosen on the pilot) | best (true best policy, regret 0: removes the candidate-selection effect) | runnerup")
     ap.add_argument("--pilot_cost", choices=["full", "cutoff"], default="full")
     ap.add_argument("--bound", choices=["t", "eb", "bet"], default="t")
     ap.add_argument("--arms", nargs="+", default=ARMS)
@@ -131,7 +132,12 @@ def main():
                     c_tr, tau_tr, _ = pv.fit_params([H[k] for k in tr]); th_tr = pv.fit_theta([H[k] for k in tr])
                     MK = [masks_for(H[k], c_tr, tau_tr, th_tr) for k in range(N)]
                     U_tr = np.array([[prec(R_true[k], MK[k][m]) for m in range(M)] for k in tr]); cand = cert.pick_candidate(U_tr)
-                    mu = np.array([[prec(R_true[k], MK[k][m]) for m in range(M)] for k in range(N)]).mean(axis=0); regret = float(mu.max() - mu[cand])
+                    mu = np.array([[prec(R_true[k], MK[k][m]) for m in range(M)] for k in range(N)]).mean(axis=0)
+                    if a.fixed_cand == "best":        # fixed-candidate design: every draw certifies the true best policy
+                        cand = int(np.argmax(mu))
+                    elif a.fixed_cand == "runnerup":
+                        cand = int(np.argsort(-mu)[1])
+                    regret = float(mu.max() - mu[cand])
                     others = [j for j in range(M) if j != cand]; gaps = {j: float(mu[j] - mu[cand]) for j in others}
                     cost_full = np.array([max(mk.sum() for mk in MK[k]) for k in range(N)], float)
                     # ---- ledgers, pilot charged first ----
@@ -252,7 +258,7 @@ def main():
                         docs[m].append(L[m].cost); dup[m].append(L[m].duplicate_fraction())
                 sl = np.asarray(feas, float); n_feas = int((sl >= 0).sum())
                 for m in arms:
-                    rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, act=cnt[m][0] / a.draws, wrong=cnt[m][1] / a.draws,
+                    rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, n_train=a.n_train, fixed_cand=a.fixed_cand, act=cnt[m][0] / a.draws, wrong=cnt[m][1] / a.draws,
                                      feasible_frac=n_feas / a.draws, act_feasible=cnt_feas[m] / max(n_feas, 1),
                                      slack_q25=float(np.quantile(sl[sl >= 0], 0.25)) if n_feas else float("nan"),
                                      slack_med=float(np.median(sl[sl >= 0])) if n_feas else float("nan"),
@@ -271,7 +277,7 @@ def main():
     import pandas as pd
     out = os.path.join(HUB, "05_results", "menu_allocation"); os.makedirs(out, exist_ok=True)
     suffix = "" if a.legacy else f"_v2_{a.pilot_cost}_{a.bound}"
-    pd.DataFrame(rows).to_csv(os.path.join(out, f"menu_alloc_{a.stack}_{a.judge}{suffix}{a.tag}.csv"), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join(out, f"menu_alloc_{a.stack}_{a.judge}{suffix}{a.tag}{'' if a.fixed_cand == 'pilot' else '_cand' + a.fixed_cand}{'' if a.n_train == 20 else f'_ntr{a.n_train}'}.csv"), index=False)
 
 
 if __name__ == "__main__":

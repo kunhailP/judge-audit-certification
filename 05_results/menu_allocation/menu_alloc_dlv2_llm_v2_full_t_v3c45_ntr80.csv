@@ -1,0 +1,5 @@
+collection,judge,budget_full_eq,eps,method,n_train,fixed_cand,act,wrong,feasible_frac,act_feasible,slack_q25,slack_med,slack_lt_half_eps,docs_labelled,docs_pilot,docs_sampling,dup_frac,design_obj,nonoverlap,pilot_cost,bound,legacy
+dl212223,llm,45,0.03,static_sum,80,pilot,1.0,0.0,1.0,1.0,0.03,0.03,0.0,7958.006666666667,5554.843333333333,2403.163333333334,0.0,110.08338559974385,0.8356846722069249,full,t,False
+dl212223,llm,45,0.03,oracle_exact,80,pilot,1.0,0.0,1.0,1.0,0.03,0.03,0.0,7954.95,5554.843333333333,2400.1066666666666,0.0,65.35740600691197,0.8356846722069249,full,t,False
+dl212223,llm,45,0.03,plugin_exact,80,pilot,1.0,0.0,1.0,1.0,0.03,0.03,0.0,7955.106666666667,5554.843333333333,2400.2633333333333,0.0,74.67074996997447,0.8356846722069249,full,t,False
+dl212223,llm,45,0.03,per_pair,80,pilot,1.0,0.0,1.0,1.0,0.03,0.03,0.0,7912.35,5554.843333333333,2357.506666666667,0.0,,0.8356846722069249,full,t,False

@@ -459,3 +459,47 @@ arm `split_fp`(humans) / `split_fp_ppi`(rectifier D−λD̂, λ는 train에서�
 - **공유 구조의 두 이득 분리**: `83`의 `per_pair` arm(비교별 독립 표집, 동일 예산·동일 ledger) vs `static_sum`(재사용, 고정 배분) → 재사용 이득 ANTIQUE 43%, DBpedia 59%, DL 35%, CAsT ≥29%(per_pair n.r.). 배분 최적화 이득(static_sum vs oracle) 0–14%. 원고 §7(2)·부록 D에 "sharing pays, optimising the shared allocation pays little"로 기재. `nonoverlap`은 binding 비교(|gap| 최소)의 band와 나머지 band 합집합의 1−Jaccard이므로 인증을 막는 비교의 공유 구조를 측정함(확인).
 - **F4**: MC-MSE 검증을 재현 가능한 33 설정(BEIR 24 + judged reranker 9, 후자는 `--train_dir legacy` 구성에서 저장된 ρ와 일치)에서 수행: corr(MC gain, ρ)=0.78, 추정-SE 비율과 중앙값 차 0.03, TREC-COVID에서 추정-SE 비율이 이득을 과소평가(1.1–1.2 vs 1.5–1.7). 90% 구간 coverage 평균 0.90, 최소 0.81. 나머지 21 설정은 번들 부재로 추정-SE 비율만 보고.
 - ICML 트랙 B의 첫 실험은 위 per_pair/static/oracle 세 절차 비교의 합성 버전으로 확정(공유 정도만 조절). 실제 데이터에서 이미 첫 이득이 크고 둘째가 작다는 결과가 있으므로, 합성 실험의 역할은 "공유 구조(band overlap)가 첫 이득의 크기를 결정하는가"의 검증.
+
+## 14. Track A -- pilot sweep and fixed-candidate decomposition (2026-09-15)
+
+Runs: `83_menu_allocation.py` with the population estimand (v3b tags), 300 draws, arms `per_pair static_sum
+oracle_exact plugin_exact`, pilot fully charged, t bound. (a) `--n_train 10/40/80` (20 = existing v3b) with the
+candidate chosen on the pilot and shared by all arms inside a draw; (b) `--fixed_cand best` at pilot 20 (every draw
+certifies the true best policy: regret 0, so the candidate-selection effect is removed). Aggregated by
+`88_pilot_sweep.py` -> `05_results/unified/PILOT_SWEEP_v3.{csv,md}`.
+
+Findings (eps = 0.02 unless stated; eps = 0.01 is qualitatively the same):
+1. Candidate quality rises with the pilot: P(regret <= eps) = 0.71-0.87 (pilot 10), 0.85-0.92 (20), 0.93-0.98 (40),
+   0.99-1.00 (80). The pilot is the only place where a *wrong* candidate can enter.
+2. Given a feasible candidate, the shared arms certify essentially always on ANTIQUE, CAsT and DL (>= 0.95 at every
+   pilot size). DBpedia plateaus at 0.85-0.95 even when the candidate is feasible, but reaches 0.97-0.99 with the
+   true best candidate -> the DBpedia residual is a *slack* problem (feasible candidates with regret close to eps),
+   not a variance problem. `per_pair` (no label reuse) stays far below on every collection (CAsT <= 0.12).
+3. Total cost (pilot included) is *minimised by small pilots*: pilot 10 or 20 is cheapest for every shared arm on
+   every collection; pilot 40 costs 1.3-1.6x and pilot 80 costs 2.5-3.0x pilot 20. The pilot's own labels dominate
+   the gain from a better candidate. Sampling labels alone (pilot excluded) do fall monotonically with pilot size.
+4. Removing the candidate-selection effect (fixed best) changes J50_total by -2% (ANTIQUE, DL), -18% (DBpedia) and
+   -21% (CAsT): candidate selection is a second-order cost on ANTIQUE/DL and a first-order one on CAsT/DBpedia.
+5. The allocation-optimisation gain (oracle vs static_sum) stays small at every pilot size and with the fixed
+   candidate (<= 14%, CAsT); a better candidate does not unmask a hidden design gain.
+
+Pre-registered prediction for a condition not used so far (eps = 0.03, all four collections, pilot 10/20/40/80,
+launched before looking at any eps = 0.03 result):
+  P1  For every shared arm and collection, J50_total(pilot 40) > J50_total(pilot 20) and J50_total(pilot 80) >
+      J50_total(pilot 40); pilot 10 is within +-15% of pilot 20.
+  P2  ACT | feasible >= 0.95 for static_sum/oracle_exact on ANTIQUE, CAsT, DL at every pilot size.
+  P3  oracle_exact saves <= 15% of J50_total relative to static_sum on every collection.
+Falsification: any collection where pilot 40 beats pilot 20 in total cost (P1), or where oracle saves > 15% (P3).
+
+Outcome of the held-out eps = 0.03 run (`88_pilot_sweep.py`, section "Held-out check"):
+  P1 monotone part  : held on 12/12 (arm, collection) cells -- J50_total(40) > J50_total(20), J50_total(80) > J50_total(40).
+  P1 "pilot 10 within +-15% of pilot 20": FAILED. Pilot 10 is 3-13% cheaper on CAsT and 18-30% cheaper on ANTIQUE,
+      DBpedia, DL. Direction: the looser eps, the smaller the cost-minimising pilot (wrong candidates get rarer,
+      the pilot's price does not). Reported as a failed prediction in Appendix D and Limitations.
+  P2 held (ACT|feasible >= 0.95 on ANTIQUE, CAsT, DL for static_sum / oracle_exact at every pilot size).
+  P3 held (oracle saving 0-4% of J50_total vs static_sum).
+Manuscript: Appendix D gains a "Pilot size and the candidate-selection effect" paragraph + Table (tab:pilot);
+Sec. 7(2)(a) and App. D(i) now attribute the DBpedia residual to small slack (fixed best -> 0.99 at eps 0.02, 0.90 at
+eps 0.01) rather than to "residual variance of the hardest comparison"; Limitations records the failed sub-prediction;
+App. D's closing sentence replaces "governed first by the pilot's candidate choice" with the split by collection and
+the reading "diagnose the candidate's failure rate and slack before optimising where the remaining labels go".
