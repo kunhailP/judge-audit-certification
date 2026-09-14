@@ -1,0 +1,11 @@
+collection,judge,budget_full_eq,eps,method,act,wrong,docs_labelled,docs_pilot,dup_frac,var_est,sampling,pilot_cost,cv_pred,bound
+dbpedia-entity,llm,30,0.01,weighted_cv,0.28,0.0,1910.1733333333334,1031.1166666666666,0.0,0.0637494317816529,shared,full,binary,t
+dbpedia-entity,llm,30,0.01,ai_calib,0.22,0.0033333333333333335,1908.1933333333334,1031.1166666666666,0.0,0.09602163127724618,shared,full,binary,t
+dbpedia-entity,llm,30,0.01,ai_resid,0.23,0.0,1910.05,1031.1166666666666,0.0,0.06683152146246295,shared,full,binary,t
+dbpedia-entity,llm,30,0.01,ai_robust_0.5,0.23,0.0,1909.3,1031.1166666666666,0.0,0.06391150360511796,shared,full,binary,t
+dbpedia-entity,llm,30,0.01,ai_robust_0.3,0.23333333333333334,0.0,1908.6466666666668,1031.1166666666666,0.0,0.06324154880134512,shared,full,binary,t
+dbpedia-entity,llm,30,0.02,weighted_cv,0.43666666666666665,0.0,1889.8666666666666,1026.33,0.0,0.06383534678460047,shared,full,binary,t
+dbpedia-entity,llm,30,0.02,ai_calib,0.2966666666666667,0.0,1886.9133333333334,1026.33,0.0,0.0959126281809453,shared,full,binary,t
+dbpedia-entity,llm,30,0.02,ai_resid,0.43,0.0,1889.63,1026.33,0.0,0.0686861648107713,shared,full,binary,t
+dbpedia-entity,llm,30,0.02,ai_robust_0.5,0.43333333333333335,0.0,1891.6833333333334,1026.33,0.0,0.06328978414655897,shared,full,binary,t
+dbpedia-entity,llm,30,0.02,ai_robust_0.3,0.45666666666666667,0.0,1891.2433333333333,1026.33,0.0,0.06484152125406836,shared,full,binary,t

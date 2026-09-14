@@ -35,9 +35,10 @@ ARMS = ["weighted_cv", "ai_calib", "ai_resid", "ai_robust_0.5", "ai_robust_0.3"]
 
 
 def cv_estimate(w, r, jhat, pi, samp):
+    """CV estimate of Σ w r, its deterministic range, and the HT estimate of its document-sampling variance."""
     ok = samp & (pi > 0); pos = pi > 0
-    base = float((w * jhat).sum()); span = float((np.abs(w[pos]) / pi[pos]).sum())
-    return base + float((w[ok] * (r[ok] - jhat[ok]) / pi[ok]).sum()), base - span, base + span
+    base = float((w * jhat).sum()); span = float((np.abs(w[pos]) / pi[pos]).sum()); y = r - jhat
+    return base + float((w[ok] * y[ok] / pi[ok]).sum()), base - span, base + span, cert.ht_var_hat(w, y, pi, samp)
 
 
 def main():
@@ -112,6 +113,8 @@ def main():
                         continue
                     b_pair = b if a.legacy else max(1, b / len(others))
                     est = {m: {j: [] for j in others} for m in ARMS}; lo_ = {m: {j: [] for j in others} for m in ARMS}; hi_ = {m: {j: [] for j in others} for m in ARMS}
+                    vh = {m: {j: [] for j in others} for m in ARMS}
+                    D_known = {j: np.array([(wa.weights(arr[k][2], j, cand, len(arr[k][0])) * arr[k][0]).sum() for k in tr]) for j in others}
                     for k in q_w:
                         r, rj, ks = arr[k]; n = len(r); pj = prob[H[k]["qid"]]; qid = H[k]["qid"]
                         jhat = rj if a.cv_pred == "binary" else pj
@@ -127,19 +130,23 @@ def main():
                             for m in ARMS:
                                 pi = pis[m]; samp = (rng.random(n) < pi) & (pi > 0); L[m].request(qid, np.flatnonzero(samp), pool_size=n)
                                 for j in others:
-                                    v, lo, hi = cv_estimate(W[j], r, jhat, pi, samp); est[m][j].append(v); lo_[m][j].append(lo); hi_[m][j].append(hi)
+                                    v, lo, hi, vv = cv_estimate(W[j], r, jhat, pi, samp); est[m][j].append(v); lo_[m][j].append(lo); hi_[m][j].append(hi); vh[m][j].append(vv)
                         else:
                             bb = b_pair
                             for j in others:
                                 pis = pis_for(np.abs(W[j]))
                                 for m in ARMS:
                                     pi = pis[m]; samp = (rng.random(n) < pi) & (pi > 0); L[m].request(qid, np.flatnonzero(samp), pool_size=n)
-                                    v, lo, hi = cv_estimate(W[j], r, jhat, pi, samp); est[m][j].append(v); lo_[m][j].append(lo); hi_[m][j].append(hi)
+                                    v, lo, hi, vv = cv_estimate(W[j], r, jhat, pi, samp); est[m][j].append(v); lo_[m][j].append(lo); hi_[m][j].append(hi); vh[m][j].append(vv)
                     for m in ARMS:
                         ok = True
                         for j in others:
                             D = np.array(est[m][j]); varr[m].append(float(D.var(ddof=1)))
-                            if cert.ucb_mean_upper(D, a_sim, min(lo_[m][j]), max(hi_[m][j]), a.bound) > eps:
+                            if a.bound == "t" and not a.legacy:   # population estimand, two-stage bound (see 81)
+                                ucb = cert.ucb_population_two_stage(D_known[j], D, np.array(vh[m][j]), N, a_sim)
+                            else:
+                                ucb = cert.ucb_mean_upper(D, a_sim, min(lo_[m][j]), max(hi_[m][j]), a.bound)
+                            if ucb > eps:
                                 ok = False
                         labels[m].append(L[m].cost); dup[m].append(L[m].duplicate_fraction())
                         if ok:

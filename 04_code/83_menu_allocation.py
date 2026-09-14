@@ -68,10 +68,11 @@ def prec(r, mk):
 
 
 def cv_estimate(w, r, rj, pi, samp):
-    """Control-variate estimate of Σ w r and its deterministic range given (w, rj, π)."""
+    """Control-variate estimate of Σ w r, its deterministic range given (w, rj, π), and the HT estimate of its
+    document-sampling variance (two-stage population bound)."""
     ok = samp & (pi > 0); pos = pi > 0
-    base = float((w * rj).sum()); span = float((np.abs(w[pos]) / pi[pos]).sum())
-    return base + float((w[ok] * (r[ok] - rj[ok]) / pi[ok]).sum()), base - span, base + span
+    base = float((w * rj).sum()); span = float((np.abs(w[pos]) / pi[pos]).sum()); y = r - rj
+    return base + float((w[ok] * y[ok] / pi[ok]).sum()), base - span, base + span, cert.ht_var_hat(w, y, pi, samp)
 
 
 def residual_model(pj_bins, resid_sq, edges, v_floor):
@@ -172,6 +173,15 @@ def main():
                     def v_pop(k):
                         idx = np.clip(np.searchsorted(edges_pop, PJ[k], side="right") - 1, 0, len(edges_pop) - 2); return vbin_pop[idx]
                     est = {m: {j: [] for j in others} for m in arms}; rlo = {m: {j: [] for j in others} for m in arms}; rhi = {m: {j: [] for j in others} for m in arms}
+                    vh = {m: {j: [] for j in others} for m in arms}
+
+                    def ucb_pop(m, j, delta):
+                        """UCB on the population mean of D_j: pilot exact + two-stage bound on the rest (t), or the legacy
+                        per-query bound (bet / eb / --legacy)."""
+                        D = np.array(est[m][j])
+                        if a.bound == "t" and not a.legacy:
+                            return cert.ucb_population_two_stage(D_pilot[j], D, np.array(vh[m][j]), N, delta)
+                        return cert.ucb_mean_upper(D, delta, min(rlo[m][j]), max(rhi[m][j]), a.bound)
                     lam = {m: {j: 1.0 for j in others} for m in arms}
                     if "oracle" in arms:
                         lam["oracle"] = {j: 1.0 / max(eps - gaps[j], S_FLOOR) for j in others}
@@ -205,7 +215,7 @@ def main():
                                     # equal expected label count per query (b) as the shared arms; each query serves one pair only
                                     base = np.abs(weights(k, j_only)); pi = sb.sample_pi(base, min(b * (len(others) if a.legacy else 1), n), n)
                                     samp = (rng.random(n) < pi) & (pi > 0); L[m].request(qid, np.flatnonzero(samp), pool_size=n)
-                                    v, lo, hi = cv_estimate(weights(k, j_only), r, rj, pi, samp); est[m][j_only].append(v); rlo[m][j_only].append(lo); rhi[m][j_only].append(hi)
+                                    v, lo, hi, vv = cv_estimate(weights(k, j_only), r, rj, pi, samp); est[m][j_only].append(v); rlo[m][j_only].append(lo); rhi[m][j_only].append(hi); vh[m][j_only].append(vv)
                                     continue
                                 if m in PI_exact:
                                     pi = PI_exact[m][offs[gi]:offs[gi + 1]]
@@ -215,7 +225,7 @@ def main():
                                     lm = lam[m]; base = sum(lm[j] * np.abs(weights(k, j)) for j in others); pi = sb.sample_pi(base, b, n)
                                 samp = (rng.random(n) < pi) & (pi > 0); L[m].request(qid, np.flatnonzero(samp), pool_size=n)
                                 for j in others:
-                                    v, lo, hi = cv_estimate(weights(k, j), r, rj, pi, samp); est[m][j].append(v); rlo[m][j].append(lo); rhi[m][j].append(hi)
+                                    v, lo, hi, vv = cv_estimate(weights(k, j), r, rj, pi, samp); est[m][j].append(v); rlo[m][j].append(lo); rhi[m][j].append(hi); vh[m][j].append(vv)
                                 PI_round.append(pi)
                             if m != "per_pair" and PI_round:
                                 A_r = np.concatenate([np.stack([weights(k, j) for j in others]) for k in chunk], axis=1)
@@ -224,17 +234,17 @@ def main():
                         if "adaptive" in arms and r_idx < a.rounds - 1:
                             lm = {}
                             for j in others:
-                                D = np.array(est["adaptive"][j]); nq = len(D)
-                                ucb = D.mean() + cert.t_quantile(1 - a_sim, max(nq - 1, 2)) * D.std(ddof=1) / math.sqrt(max(nq, 2)) if nq > 2 else eps
+                                nq = len(est["adaptive"][j])
+                                ucb = ucb_pop("adaptive", j, a_sim) if nq > 2 else eps
                                 lm[j] = 1.0 / max(eps - ucb, S_FLOOR) if ucb < eps else 1.0 / S_FLOOR
                             mx = max(lm.values()); lam["adaptive"] = {j: max(v / mx, 0.1) for j, v in lm.items()}
                     for m in arms:
                         ok = True
                         for j in others:
-                            D = np.array(est[m][j]); nq = len(D)
+                            nq = len(est[m][j])
                             if nq < 5:
                                 ok = False; break
-                            ucb = cert.ucb_mean_upper(D, a_sim, min(rlo[m][j]), max(rhi[m][j]), a.bound)
+                            ucb = ucb_pop(m, j, a_sim)
                             if ucb > eps:
                                 ok = False; break
                         if ok:

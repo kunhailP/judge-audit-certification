@@ -423,3 +423,39 @@ arm `split_fp`(humans) / `split_fp_ppi`(rectifier D−λD̂, λ는 train에서�
 자동 삽입된 `Co-authored-by` trailer(Cursor / Claude)를 세 커밋 메시지에서 제거해 단일 저자로 정리. 트리·저자·날짜 불변.
 해시 변경: e0609ea→6aa813a, 978856e→d9aeef3, 9aa624e→d678bc7 (`03_data/LOCK_ARTIFACTS_e0609ea/HASH_MAP.txt`). 태그 `lock-e0609ea-2026-09-14`는
 6aa813a로 이동. 로컬 `commit-msg` hook이 이후 커밋에서도 trailer를 제거. 백업 브랜치 `backup/main-e0609ea`, `backup/featured-prep-9aa624e`는 로컬에만.
+
+## 13. 2차 리뷰(2026-09-14 23:18 KST) 대응 — 실행 오류·estimand 정합성 수정과 재생성
+
+### 13.1 수정
+| 지적 | 수정 | 파일 |
+|---|---|---|
+| `63` finite-population arm 평가가 split_t/ppi/auto 종료 시 중단 → 미평가를 `abstain`으로 기록 | 5개 split arm 중 하나라도 미종료면 계속 평가 | `63_planner_v2.py` |
+| `81/82/83`가 μ_R(pilot 제외 query 평균)을 추정하면서 μ_N(전체 모집단)으로 판정 | pilot의 D_j는 정확히 알고, 나머지 R에서 WoR로 뽑힌 query의 문서 단위 추정치에 2단계 분산 V̂=(1−f)s_b²/n + f·mean(v̂_within)/n (f=n/|R|, v̂=HT 문서표집 분산)을 씌워 UCB_N=(Σ_A D+|R|·UCB_R)/N. 합성 MC 2000회 miscoverage 0.039 (f=0.3), 0.052 (f=1), 목표 0.05 | `lib/certificates.py` (`ht_var_hat`, `ucb_two_stage`, `ucb_population_two_stage`), `81`, `82`, `83` (`--bound t`, 비-legacy에서만) |
+| `86` grid2 파일 중복 읽기 | `sorted(set(files))`; v2 수치 불변 확인. `v3` 세대(`*_v3b{budget}_*`) 지원, eps=0.01 tex도 생성 | `86_table2_v2.py` |
+| 부록 E 모집단 라벨 비율에 pilot 20 누락 | T는 pilot 포함 전체 감사 query 수로 정의, T/N 보고. 새 표 생성기 | `87_exact_table.py` |
+| 후보를 training half에서 고른다는 본문 서술 (실행은 validation) | §4 split certificate 문단·Prop. B 증명 "(as implemented)" 정정 | `main.tex` |
+| "cannot bias the bound" | 추정량의 불편성(모든 judge에서 성립)과 bound의 coverage(bound의 가정에 의존)를 분리해 서술 (초록·기여 2·결론) | `main.tex` |
+| `67` ess_gain = 추정 SE 비율 | 명칭을 "ratio of squared estimated standard errors"로 통일. MC-MSE 열은 pool이 번들에 있는 설정만 재생성 가능(legacy/modern/judged reranker); TREC DL 2019/20 pool과 covid/touché의 Qwen3-8B 판정은 번들에 없음 | `main.tex`, `05_results/ppi_gain/` |
+
+### 13.2 재실행 (모두 300 draws, 예산별 1 프로세스, tag `_v3b{B}`)
+- `81/82`: antique {5..150}×{llm,rr,inv}, cast19 {15..200}×3, dbpedia {5..200}×{llm,rr}, dl212223 {5..90}×llm → 모든 셀 비검열(eps=0.02).
+- `83`: 4 collection, 전 arm, 동일 격자. `85_gates.py --gen v3`.
+- `63`: `--ntr_fixed 20 --truth population --looks 30 50 70 90 120 150 158 199 200 210 250 300 350 398` (마지막 look = N−1), bound t / bet_wor, 300 repeats → `planner_v2/{stack}_llm_pop_{bound}_ntr20_v3`.
+
+### 13.3 결과가 바뀐 곳
+**부록 E.** 게이트 수정 후 betting WoR arm은 결국 88–100% 인증하지만, ANTIQUE·CAsT(median slack≈ε)는 T/N≤0.75에서 0–2%, ≤0.9에서 3–5%, 마지막 look(T=N−1, 전수조사)에서만 발화. DBpedia(N=399)·DL(margin 큼)은 75%에서 90%/73%. 결론을 "비실용적"에서 "margin 또는 N이 크면 감당 가능, margin≈ε이면 전수조사"로 수정. FPC-t는 4 collection 모두 ACT 1.00, T̄ 20–27% 단축.
+
+**Table 2 (v3).** estimand 정합화로 모든 비용이 내려갔고 CAsT가 가장 크게 움직임(weighted 3,894→2,127). humans-only 절감 40/56/54/56% (ANTIQUE/CAsT/DBpedia/DL). λ-fit Qwen3-8B 증분 8/19/20/3%; reranker 8–19%; 반전 judge 2–5%(잡음). pilot 비중(weighted J50 기준) 76/46/41/78%. pilot 제외 증분 32–35% (DL 16%). judge-assisted 4 arm 간 분산 3–11%. calibrated-judge rule: 반전 judge +40%(ANTIQUE), +29%(CAsT). eps=0.01도 uniform(CAsT·DBpedia) 외 전 셀 도달 → 부록 표 `tab:J50b`.
+
+**메뉴 배분 (Gate A 재평가).** oracle 절감 2/14/0/7% (eps 0.02), 1/17/1/6% (0.01); plug-in 2/12/−13/2.5%. Gate A FAIL 유지. plateau 분해: infeasible 8–16%; ACT|feasible 최대 예산에서 ANTIQUE·CAsT·DL 0.97–1.00 (→ plateau = pilot cap), DBpedia 0.83–0.89 (잔여 분산). **CAsT는 estimand 수정 전 "인증 불가"였으나 이제 인증되며, oracle 이득이 유일하게 의미 있는(14–17%) collection.** 원고 §7(2)·부록 D를 collection별로 다시 씀.
+
+### 13.4 남은 것
+- `67` judged stack: 저장된 CSV의 ρ(covid 0.794, dbpedia 0.54)는 judged 3종 LODO(0.50/0.12)로도, `--train_dir legacy`(0.759/…)로도 정확히 재현되지 않음 → 원 실행 구성 미상. F4의 MC-MSE 검증은 정확히 재현되는 legacy/modern 24점 + 재실행 구성의 judged 9점으로 보고하고 구성 차이를 명시.
+- pilot × ε sweep(후보 공유, 세 측정값)은 이 커밋 이후.
+
+### 13.5 3차 리뷰(2026-09-15 00:45 KST) 대응
+- **같은 추출 기록으로 두 수정의 기여 분리** (`81 --tag _attr_b*`, 열 `act_iid`/`act_pilot_iid`/`act`): CAsT weighted J50 3,907 (i.i.d. t) → 2,600 (pilot 정확 반영, −33%) → 2,127 (2단계 분산+FPC, 추가 −18%); ANTIQUE 881 → 851 → 836; DL은 격자 최소 예산에서 이미 ACT≥0.5(검열). 원고 §5.3 estimand 문단에 기재.
+- **부록 E 표현 수정**: T=N−1은 전수조사가 아니라 "전수조사에 가까운 예산"; "정확한 평균을 안다" 삭제; ANTIQUE·CAsT에서 exact 인증은 실질적 라벨 절감이 거의 없다고 서술. margin 설명은 slack s=ε−Regret_N(m̂)·N·잔차분산·범위를 분리하는 고정 후보 실험이 필요한 가설로 격하.
+- **공유 구조의 두 이득 분리**: `83`의 `per_pair` arm(비교별 독립 표집, 동일 예산·동일 ledger) vs `static_sum`(재사용, 고정 배분) → 재사용 이득 ANTIQUE 43%, DBpedia 59%, DL 35%, CAsT ≥29%(per_pair n.r.). 배분 최적화 이득(static_sum vs oracle) 0–14%. 원고 §7(2)·부록 D에 "sharing pays, optimising the shared allocation pays little"로 기재. `nonoverlap`은 binding 비교(|gap| 최소)의 band와 나머지 band 합집합의 1−Jaccard이므로 인증을 막는 비교의 공유 구조를 측정함(확인).
+- **F4**: MC-MSE 검증을 재현 가능한 33 설정(BEIR 24 + judged reranker 9, 후자는 `--train_dir legacy` 구성에서 저장된 ρ와 일치)에서 수행: corr(MC gain, ρ)=0.78, 추정-SE 비율과 중앙값 차 0.03, TREC-COVID에서 추정-SE 비율이 이득을 과소평가(1.1–1.2 vs 1.5–1.7). 90% 구간 coverage 평균 0.90, 최소 0.81. 나머지 21 설정은 번들 부재로 추정-SE 비율만 보고.
+- ICML 트랙 B의 첫 실험은 위 per_pair/static/oracle 세 절차 비교의 합성 버전으로 확정(공유 정도만 조절). 실제 데이터에서 이미 첫 이득이 크고 둘째가 작다는 결과가 있으므로, 합성 실험의 역할은 "공유 구조(band overlap)가 첫 이득의 크기를 결정하는가"의 검증.

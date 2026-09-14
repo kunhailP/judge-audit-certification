@@ -313,6 +313,39 @@ def ucb_pairs(U, cand, alpha_prime, lo=-1.0, hi=1.0, method=None, N=None):
     return ucb
 
 
+def ht_var_hat(w, y, pi, samp):
+    """Unbiased (Horvitz-Thompson, Poisson sampling) estimate of Var(sum_{d in S} w_d y_d / pi_d):
+    sum_{d in S} w_d^2 y_d^2 (1 - pi_d) / pi_d^2.  y is the labelled quantity (r, or r - lam*rj for control variates)."""
+    ok = samp & (pi > 0)
+    return float(((w[ok] * y[ok]) ** 2 * (1.0 - pi[ok]) / pi[ok] ** 2).sum())
+
+
+def ucb_two_stage(Dhat, vhat, N_R, delta):
+    """One-sided (1-delta) t upper bound on the mean of a finite population of N_R queries from a simple random sample
+    (without replacement) of n of them, each observed through an unbiased document-level estimate Dhat_q with an
+    unbiased within-query variance estimate vhat_q (two-stage sampling, Cochran 1977, Sec. 10.9):
+        Var_hat(mean) = (1 - f) s_b^2 / n + f * mean(vhat) / n,   f = n / N_R,
+    where s_b^2 is the sample variance of the Dhat_q (it already contains the within-query noise). When f = 1 every
+    query of the population is audited and only the document-sampling variance remains; when f -> 0 this is the
+    usual t bound on the Dhat_q. Asymptotic (t) calibration, as for ucb_mean_upper(method="t")."""
+    Dhat = np.asarray(Dhat, float); vhat = np.asarray(vhat, float); n = len(Dhat)
+    if n < 2:
+        return float("inf")
+    f = min(1.0, n / float(N_R))
+    v = max((1.0 - f) * Dhat.var(ddof=1) / n + f * vhat.mean() / n, 0.0)
+    return float(Dhat.mean() + t_quantile(1 - delta, n - 1) * math.sqrt(v))
+
+
+def ucb_population_two_stage(D_known, Dhat, vhat, N, delta):
+    """Upper bound on the finite-population mean over all N queries when n_k queries (the pilot) are fully labelled and
+    known exactly and the remaining N - n_k are represented by a WoR sample of document-level estimates:
+        mu_N = (sum(D_known) + (N - n_k) * mu_rest) / N,  mu_rest bounded by ucb_two_stage(Dhat, vhat, N - n_k)."""
+    D_known = np.asarray(D_known, float); nk = len(D_known); N_R = N - nk
+    if N_R <= 0:
+        return float(D_known.mean())
+    return float((D_known.sum() + N_R * ucb_two_stage(Dhat, vhat, N_R, delta)) / N)
+
+
 def ucb_finite_population(x_known, x_sample, N, delta, lo, hi, method):
     """Upper bound on the finite-population mean over N units when n_k units are fully known (x_known) and the
     remaining N - n_k units are represented by a uniformly random WoR sample x_sample:

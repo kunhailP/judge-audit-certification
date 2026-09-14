@@ -320,7 +320,10 @@ def main():
                         if ucb.max() <= EPS_SEL:
                             state["loo_sim"] = ("act", T, dict(pick=cand, c_hat=c_hat, tau_i=tau_i, th_i=th_i))
                 # ---- split designs ----
-                if state["split_t"] is None or state["split_ppi"] is None or state["split_auto"] is None:
+                # Every split arm keeps being evaluated until IT terminates (review 2026-09-14 follow-up: the gate used
+                # to test only split_t/split_ppi/split_auto, so the finite-population arms stopped being evaluated as
+                # soon as those three had certified and were then recorded as "abstain" at the maximal look).
+                if any(state[k] is None for k in ["split_t", "split_ppi", "split_auto", "split_fp", "split_fp_ppi"]):
                     ntr = T // 2 if a.ntr_fixed <= 0 else min(a.ntr_fixed, T // 2)
                     train = [H[i] for i in perm[:ntr]]; val = [H[i] for i in perm[ntr:T]]
                     c_tr, tau_tr, _ = fit_params(train); th_tr = fit_theta(train)

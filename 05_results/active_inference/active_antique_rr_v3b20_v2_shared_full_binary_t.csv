@@ -1,0 +1,11 @@
+collection,judge,budget_full_eq,eps,method,act,wrong,docs_labelled,docs_pilot,dup_frac,var_est,sampling,pilot_cost,cv_pred,bound
+antique,rr,20,0.01,weighted_cv,0.8233333333333334,0.0,1034.9533333333334,632.83,0.0,0.10621348901891615,shared,full,binary,t
+antique,rr,20,0.01,ai_calib,0.73,0.0,1034.4733333333334,632.83,0.0,0.15248332221575564,shared,full,binary,t
+antique,rr,20,0.01,ai_resid,0.86,0.0,1034.97,632.83,0.0,0.11651627580657234,shared,full,binary,t
+antique,rr,20,0.01,ai_robust_0.5,0.8733333333333333,0.0,1034.3933333333334,632.83,0.0,0.1039033858007909,shared,full,binary,t
+antique,rr,20,0.01,ai_robust_0.3,0.8566666666666667,0.0,1035.7866666666666,632.83,0.0,0.10659446034318436,shared,full,binary,t
+antique,rr,20,0.02,weighted_cv,0.92,0.0,1031.1633333333334,630.86,0.0,0.10420751835432371,shared,full,binary,t
+antique,rr,20,0.02,ai_calib,0.79,0.0,1031.4233333333334,630.86,0.0,0.1544104537796355,shared,full,binary,t
+antique,rr,20,0.02,ai_resid,0.92,0.0,1030.6066666666666,630.86,0.0,0.10639916044619346,shared,full,binary,t
+antique,rr,20,0.02,ai_robust_0.5,0.9,0.0,1029.01,630.86,0.0,0.104719438134014,shared,full,binary,t
+antique,rr,20,0.02,ai_robust_0.3,0.9066666666666666,0.0,1032.0933333333332,630.86,0.0,0.1058760930286626,shared,full,binary,t

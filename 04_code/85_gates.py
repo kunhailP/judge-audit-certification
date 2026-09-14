@@ -36,8 +36,12 @@ def main():
     ap.add_argument("--baseline", default="static_sum", choices=["static_sum", "static_sum_v"]); ap.add_argument("--judge", default="llm")
     ap.add_argument("--min_saving", type=float, default=0.30); ap.add_argument("--min_median", type=float, default=0.20)
     ap.add_argument("--min_recovery", type=float, default=0.60); ap.add_argument("--min_actual", type=float, default=0.15)
+    ap.add_argument("--gen", default="v3", choices=["v2", "v3"], help="v3 = population estimand runs (menu_alloc_*_v3b*.csv); v2 = superseded")
     a = ap.parse_args()
-    files = sorted(glob.glob(os.path.join(R, f"menu_alloc_*_{a.judge}_v2_{a.pilot_cost}_{a.bound}.csv")))
+    if a.gen == "v3":
+        files = sorted(glob.glob(os.path.join(R, f"menu_alloc_*_{a.judge}_v2_{a.pilot_cost}_{a.bound}_v3b*.csv")))
+    else:
+        files = sorted(glob.glob(os.path.join(R, f"menu_alloc_*_{a.judge}_v2_{a.pilot_cost}_{a.bound}.csv")))
     if not files:
         print("no v2 menu results found for", a.judge, a.pilot_cost, a.bound); return
     d = pd.concat([pd.read_csv(f) for f in files]); d = d[(d.eps == a.eps)]
@@ -69,7 +73,7 @@ def main():
         gateB = (ga.recovery >= a.min_recovery).all() and (t.saving_plugin >= a.min_actual).sum() >= 2 and (t.wrong_plugin.fillna(0) <= ALPHA).all()
         print(f"Gate B: recovery on Gate-A collections {ga.recovery.round(2).tolist()} (need all >= {a.min_recovery:.0%}); collections with saving_plugin >= {a.min_actual:.0%}: {(t.saving_plugin >= a.min_actual).sum()} (need >= 2); max wrong(plugin) {t.wrong_plugin.max():.3f} (need <= {ALPHA}) -> {'PASS' if gateB else 'FAIL'}")
     os.makedirs(os.path.join(HUB, "05_results", "unified"), exist_ok=True)
-    t.to_csv(os.path.join(HUB, "05_results", "unified", f"gates_eps{a.eps}_{a.bound}_{a.pilot_cost}_{a.baseline}_{a.judge}.csv"), index=False)
+    t.to_csv(os.path.join(HUB, "05_results", "unified", f"gates_eps{a.eps}_{a.bound}_{a.pilot_cost}_{a.baseline}_{a.judge}{'_v3' if a.gen == 'v3' else ''}.csv"), index=False)
 
 
 if __name__ == "__main__":
