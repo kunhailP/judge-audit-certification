@@ -21,8 +21,13 @@ def sha256(path, chunk=1 << 20):
     return h.hexdigest()
 
 
+EXCLUDE_TOP = {"emb"}   # embedding caches of the pool builders (regenerable, ~2 GB); not read by 63/81-86
+
+
 def walk(root):
-    for dp, _, fns in os.walk(root):
+    for dp, dns, fns in os.walk(root):
+        if dp == root:
+            dns[:] = [d for d in dns if d not in EXCLUDE_TOP]
         for fn in sorted(fns):
             p = os.path.join(dp, fn); rel = os.path.relpath(p, root)
             if rel in ("MANIFEST.csv",):

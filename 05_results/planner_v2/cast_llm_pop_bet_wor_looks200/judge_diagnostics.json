@@ -1,0 +1,19 @@
+{
+  "cast19": {
+    "judge_acc": 0.788672429363953,
+    "rho_glob_probe_vs_trunc": 0.662764604391831,
+    "err_in_glob_probe_vs_trunc": 0.27491408934707906,
+    "err_out_glob_probe_vs_trunc": 0.19663278271918677,
+    "band_frac_glob_probe_vs_trunc": 0.18771771384337504,
+    "rho_glob_probe_vs_ad_probe": 0.6057115257439049,
+    "err_in_glob_probe_vs_ad_probe": 0.2656675749318801,
+    "err_out_glob_probe_vs_ad_probe": 0.2056434373663959,
+    "band_frac_glob_probe_vs_ad_probe": 0.09469745839246549,
+    "rho_trunc_vs_ad_probe": 0.7035390578646283,
+    "err_in_trunc_vs_ad_probe": 0.2723915050784857,
+    "err_out_trunc_vs_ad_probe": 0.20140971805638871,
+    "band_frac_trunc_vs_ad_probe": 0.1397239065926977,
+    "n_queries": 159,
+    "c_star": 5.325525556686807
+  }
+}

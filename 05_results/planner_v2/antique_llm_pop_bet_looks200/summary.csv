@@ -1,0 +1,13 @@
+collection,method,act_rate,mean_T,wrong_cert_rate
+antique,loo_boot,0.8966666666666666,56.4,0.1
+antique,loo_sim,0.8233333333333334,65.13333333333334,0.07666666666666666
+antique,recal_bp,0.5266666666666666,82.86666666666666,0.0
+antique,recal_bpu,0.0,90.0,0.0
+antique,recal_bpx,0.4,85.13333333333334,0.0
+antique,recal_bpxu,0.0,90.0,0.0
+antique,recal_ep,0.69,67.73333333333333,0.016666666666666666
+antique,split_auto,0.05333333333333334,89.33333333333333,0.0
+antique,split_fp,0.0,90.0,0.0
+antique,split_fp_ppi,0.0,90.0,0.0
+antique,split_ppi,0.22,86.13333333333334,0.0033333333333333335
+antique,split_t,0.0,90.0,0.0

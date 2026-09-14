@@ -122,6 +122,9 @@ def main():
             for eps in a.eps:
                 cnt = {m: [0, 0] for m in arms}; overlap = []; docs = {m: [] for m in arms}; dup = {m: [] for m in arms}; pil = []
                 obj = {m: [] for m in arms}
+                # plateau diagnostic: a draw is *feasible* when the pilot-chosen candidate has true regret <= eps (only then can a
+                # correct certificate exist); ACT is additionally recorded among feasible draws, and the slack eps - regret is kept
+                feas = []; cnt_feas = {m: 0 for m in arms}
                 for _ in range(a.draws):
                     perm = rng.permutation(N); tr = perm[:a.n_train]
                     c_tr, tau_tr, _ = pv.fit_params([H[k] for k in tr]); th_tr = pv.fit_theta([H[k] for k in tr])
@@ -142,6 +145,7 @@ def main():
                     B = Bq * float(cost_full.mean()) - (float(cost_full[tr].sum()) if a.legacy else 0.0)
                     if B <= 0:
                         continue
+                    feas.append(eps - regret)
                     rest = perm[a.n_train:]; chunks = np.array_split(rest, a.rounds)
                     jb = min(others, key=lambda j: abs(gaps[j]))
                     ov = []
@@ -234,10 +238,15 @@ def main():
                             if ucb > eps:
                                 ok = False; break
                         if ok:
-                            cnt[m][0] += 1; cnt[m][1] += regret > eps
+                            cnt[m][0] += 1; cnt[m][1] += regret > eps; cnt_feas[m] += regret <= eps
                         docs[m].append(L[m].cost); dup[m].append(L[m].duplicate_fraction())
+                sl = np.asarray(feas, float); n_feas = int((sl >= 0).sum())
                 for m in arms:
                     rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, act=cnt[m][0] / a.draws, wrong=cnt[m][1] / a.draws,
+                                     feasible_frac=n_feas / a.draws, act_feasible=cnt_feas[m] / max(n_feas, 1),
+                                     slack_q25=float(np.quantile(sl[sl >= 0], 0.25)) if n_feas else float("nan"),
+                                     slack_med=float(np.median(sl[sl >= 0])) if n_feas else float("nan"),
+                                     slack_lt_half_eps=float((sl[sl >= 0] < eps / 2).mean()) if n_feas else float("nan"),
                                      docs_labelled=float(np.mean(docs[m])) if docs[m] else float("nan"), docs_pilot=float(np.mean(pil)) if pil else float("nan"),
                                      docs_sampling=float(np.mean(docs[m]) - np.mean(pil)) if docs[m] else float("nan"),
                                      dup_frac=float(np.mean(dup[m])) if dup[m] else float("nan"),
@@ -247,7 +256,8 @@ def main():
                 print(f"{held} B={Bq}q eps={eps}: " + " ".join(f"{m}={cnt[m][0]/a.draws:.2f}" for m in arms)
                       + f" | docs static={np.mean(docs.get('static_sum', [np.nan])):.0f} pilot={np.mean(pil) if pil else float('nan'):.0f}"
                       + f" | obj static/oracle_exact={np.nanmean(obj.get('static_sum', [np.nan]))/max(np.nanmean(obj.get('oracle_exact', [np.nan])), 1e-12):.2f}"
-                      + f" | nonoverlap={np.mean(overlap) if overlap else float('nan'):.2f} | wrong max {max(v[1] for v in cnt.values())/a.draws:.3f}", flush=True)
+                      + f" | nonoverlap={np.mean(overlap) if overlap else float('nan'):.2f} | wrong max {max(v[1] for v in cnt.values())/a.draws:.3f}"
+                      + f" | feasible={n_feas/a.draws:.2f} act|feas " + " ".join(f"{m}={cnt_feas[m]/max(n_feas,1):.2f}" for m in arms), flush=True)
     import pandas as pd
     out = os.path.join(HUB, "05_results", "menu_allocation"); os.makedirs(out, exist_ok=True)
     suffix = "" if a.legacy else f"_v2_{a.pilot_cost}_{a.bound}"

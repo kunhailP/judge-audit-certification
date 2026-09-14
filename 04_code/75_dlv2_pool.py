@@ -45,7 +45,13 @@ def read_queries(fp):
 def extract_passages(tar_path, needed, cache):
     """Scan the v2 tar (jsonl.gz shards) once; keep only needed pids."""
     if os.path.exists(cache):
-        return {l.split("\t")[0]: l.rstrip("\n").split("\t", 1)[1] for l in open(cache)}
+        # newline="" keeps carriage returns inside passages from being read as line breaks
+        out = {}
+        for l in open(cache, newline=""):
+            p = l.rstrip("\n").split("\t", 1)
+            if len(p) == 2:
+                out[p[0]] = p[1]
+        return out
     out = {}
     with tarfile.open(tar_path) as tf:
         for m in tf:
@@ -63,7 +69,7 @@ def extract_passages(tar_path, needed, cache):
                 break
     with open(cache, "w") as f:
         for pid, t in out.items():
-            f.write(f"{pid}\t{t.replace(chr(9), ' ').replace(chr(10), ' ')}\n")
+            f.write(f"{pid}\t{t.replace(chr(9), ' ').replace(chr(10), ' ').replace(chr(13), ' ')}\n")
     return out
 
 
@@ -148,7 +154,7 @@ if __name__ == "__main__":
         w = csv.writer(fm); w.writerow(["qid", "nG", "n_judged"]); w.writerows(all_meta)
     with open(os.path.join(out, "dl212223_texts.tsv"), "w") as f:
         for pid in {r[1] for r in all_rows}:
-            f.write(f"{pid}\t{texts[pid].replace(chr(9), ' ').replace(chr(10), ' ')}\n")
+            f.write(f"{pid}\t{texts[pid].replace(chr(9), ' ').replace(chr(10), ' ').replace(chr(13), ' ')}\n")
     with open(os.path.join(out, "dl212223_queries.tsv"), "w") as f:
         for y in a.years:
             for line in open(os.path.join(out, f"dl{y}_queries.tsv")):

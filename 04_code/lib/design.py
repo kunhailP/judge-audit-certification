@@ -20,7 +20,37 @@ import numpy as np
 
 
 def waterfill(g, c, B):
-    """argmin_π Σ_i g_i (1-π_i)/π_i  s.t. Σ c_i π_i <= B, 0 < π_i <= 1;  π_i = min(1, sqrt(g_i/(μ c_i)))."""
+    """argmin_π Σ_i g_i (1-π_i)/π_i  s.t. Σ c_i π_i <= B, 0 < π_i <= 1;  π_i = min(1, sqrt(g_i/(μ c_i))).
+    Exact O(n log n) solution: documents saturate (π=1) in decreasing order of g_i/c_i; for k saturated documents
+    sqrt(μ) = Σ_{unsat} sqrt(g_i c_i) / (B − Σ_{sat} c_i), and k is the smallest count consistent with the ordering."""
+    g = np.asarray(g, float); c = np.asarray(c, float); n = len(g)
+    pos = g > 0
+    if not pos.any():
+        return np.full(n, min(1.0, B / c.sum()))
+    if B >= c[pos].sum():                                    # everything with g > 0 can be labelled for sure
+        pi = np.ones(n); pi[~pos] = 0.0; return pi
+    order = np.argsort(-(g / c)); gs, cs = g[order], c[order]
+    sq = np.sqrt(gs * cs)
+    csat = np.concatenate([[0.0], np.cumsum(cs)])            # Σ_{sat} c for k = 0..n
+    sun = sq.sum() - np.concatenate([[0.0], np.cumsum(sq)])   # Σ_{unsat} sqrt(g c) for k = 0..n
+    rem = B - csat                                           # remaining budget for the unsaturated documents
+    with np.errstate(divide="ignore", invalid="ignore"):
+        sqrt_mu = np.where(rem > 0, sun / rem, np.inf)        # k = 0..n
+    # k is consistent when the k-th document (index k-1) saturates (g/c >= mu) and the (k+1)-th does not
+    ratio = gs / cs                                          # decreasing
+    mu = sqrt_mu ** 2
+    ok_next = np.concatenate([ratio < mu[:-1], [True]])      # document k (0-based) does not saturate under mu_k
+    ok_prev = np.concatenate([[True], ratio >= mu[1:]])      # document k-1 saturates under mu_k
+    ks = np.flatnonzero(ok_next & ok_prev & (rem > 0))
+    k = int(ks[0]) if len(ks) else 0
+    pi_s = np.minimum(1.0, np.sqrt(gs / (mu[k] * cs))) if np.isfinite(mu[k]) and mu[k] > 0 else np.ones(n)
+    pi = np.empty(n); pi[order] = pi_s
+    pi[~pos] = 0.0
+    return pi
+
+
+def _waterfill_bisect(g, c, B):
+    """Reference implementation (bisection on μ), kept for the self-test."""
     g = np.asarray(g, float); c = np.asarray(c, float); n = len(g)
     pos = g > 0
     if not pos.any():
@@ -78,6 +108,13 @@ def static_sum(W, B, c=None):
 
 def _selftest():
     rng = np.random.default_rng(0)
+    # (0) closed-form water-filling equals the bisection reference, including saturated documents and zeros
+    for trial in range(200):
+        n = int(rng.integers(3, 60)); g = rng.gamma(0.5, 1.0, n) * (rng.random(n) < 0.85); c = rng.uniform(0.5, 2.0, n)
+        B = float(rng.uniform(0.5, c.sum() * 1.1))
+        a, b = waterfill(g, c, B), _waterfill_bisect(g, c, B)
+        assert np.allclose(a, b, atol=1e-6), (trial, np.abs(a - b).max())
+    print("[PASS] closed-form water-filling matches bisection on 200 random instances")
     # (1) single comparison: optimum is π ∝ |a| sqrt(v)
     n = 40; a = rng.normal(0, 1, n); v = rng.uniform(0.05, 0.25, n); B = 8.0
     pi, val = oracle_design(a[None, :], v, np.array([0.01]), B)

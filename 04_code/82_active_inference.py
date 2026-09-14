@@ -53,6 +53,7 @@ def main():
     ap.add_argument("--cv_pred", choices=["binary", "prob"], default="binary")
     ap.add_argument("--bound", choices=["t", "eb", "bet"], default="t")
     ap.add_argument("--legacy", action="store_true")
+    ap.add_argument("--tag", default="", help="suffix for the output file (e.g. _grid2)")
     a = ap.parse_args()
     if a.legacy:
         a.sampling, a.pilot_cost, a.bound = "per_pair", "cutoff", "t"
@@ -152,7 +153,7 @@ def main():
     import pandas as pd
     out = os.path.join(HUB, "05_results", "active_inference"); os.makedirs(out, exist_ok=True)
     suffix = "" if a.legacy else f"_v2_{a.sampling}_{a.pilot_cost}_{a.cv_pred}_{a.bound}"
-    pd.DataFrame(rows).to_csv(os.path.join(out, f"active_{a.stack}_{a.judge}{'_boundary' if a.boundary else ''}{suffix}.csv"), index=False)
+    pd.DataFrame(rows).to_csv(os.path.join(out, f"active_{a.stack}_{a.judge}{'_boundary' if a.boundary else ''}{a.tag}{suffix}.csv"), index=False)
 
 
 if __name__ == "__main__":

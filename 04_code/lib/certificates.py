@@ -231,16 +231,23 @@ def ucb_eb(x, delta, lo, hi):
     return float(min(hi, x.mean() + math.sqrt(2 * v * L / n) + 7 * R * L / (3 * (n - 1))))
 
 
-def ucb_bet(x, delta, lo, hi, grid=None, cap=None):
-    """Betting one-sided upper confidence bound for the mean of i.i.d. x in [lo, hi]
+def ucb_bet(x, delta, lo, hi, grid=None, cap=None, N=None):
+    """Betting one-sided upper confidence bound for the mean of x in [lo, hi]
     (Waudby-Smith & Ramdas 2023, predictable plug-in bets, fixed-n version).
 
-    Rescale to X in [0,1]. For a candidate mean m the wealth K_n(m) = prod_i (1 + lam_i(m) (m - X_i)) with
-    predictable lam_i(m) in [0, cap/(1-m)] is a nonnegative supermartingale when E[X]=m, so by Ville's
+    Rescale to X in [0,1]. For a candidate mean m the wealth K_n(m) = prod_i (1 + lam_i(m) (m_i - X_i)) with
+    predictable lam_i(m) in [0, cap/(1-m_i)] is a nonnegative supermartingale under the hypothesis, so by Ville's
     inequality P(K_n(m) >= 1/delta) <= delta. m is rejected iff K_n(m) >= 1/delta; the bound is the largest
-    non-rejected grid point (rounded up to the next grid point, hence conservative). Exact finite-sample level
-    for i.i.d. bounded observations; for sampling without replacement from a finite population it is
-    conservative in the direction that matters here (the WoR mean has smaller variance)."""
+    non-rejected grid point (rounded up to the next grid point, hence conservative).
+
+    N=None: i.i.d. observations, m_i = m (exact finite-sample level for i.i.d. bounded observations).
+    N given: x is a uniformly random sample WITHOUT replacement from a finite population of size N and the target is
+    the finite-population mean (Waudby-Smith & Ramdas 2020, "Confidence sequences for sampling without replacement"):
+    under the hypothesis "population mean = m" the conditional mean of X_i given the first i-1 draws is
+    m_i = (N m - S_{i-1}) / (N - i + 1); a hypothesis with m_i outside [0,1] is impossible given the data and is
+    rejected outright. Exact finite-sample level for the finite-population mean; tighter than the i.i.d. version
+    when n/N is not small. NOTE: the i.i.d. version is *not* guaranteed valid for the finite-population mean under
+    WoR sampling; use N whenever the estimand is the finite-population mean."""
     grid = grid or BET_GRID; cap = cap or BET_CAP
     x = np.asarray(x, float); n = len(x); R = float(hi - lo)
     if n == 0 or R <= 0:
@@ -252,11 +259,21 @@ def ucb_bet(x, delta, lo, hi, grid=None, cap=None):
     mu_prev = np.r_[0.5, (0.5 + np.cumsum(X)) / (idx + 2)][:-1]
     sq_prev = np.r_[0.25, (0.25 + np.cumsum((X - mu_prev) ** 2)) / (idx + 2)][:-1]
     lam0 = np.sqrt(2 * math.log(1.0 / delta) / (sq_prev * n))
-    logK = np.zeros(len(ms)); one_m = np.maximum(1.0 - ms, 1e-12)
+    logK = np.zeros(len(ms)); rejected = np.zeros(len(ms), bool)
+    S_prev = 0.0
     for i in range(n):
+        if N is None:
+            m_i = ms
+        else:
+            m_i = (N * ms - S_prev) / (N - i)
+            bad = (m_i < -1e-12) | (m_i > 1 + 1e-12)      # hypothesis impossible given the observed prefix
+            rejected |= bad
+            m_i = np.clip(m_i, 0.0, 1.0)
+        one_m = np.maximum(1.0 - m_i, 1e-12)
         lam = np.minimum(lam0[i], cap / one_m)
-        logK += np.log1p(lam * (ms - X[i]))
-    ok = logK < math.log(1.0 / delta)
+        logK += np.log1p(np.maximum(lam * (m_i - X[i]), -cap))
+        S_prev += X[i]
+    ok = (logK < math.log(1.0 / delta)) & ~rejected
     if not ok.any():
         return float(lo)
     j = int(np.flatnonzero(ok).max())
@@ -264,29 +281,48 @@ def ucb_bet(x, delta, lo, hi, grid=None, cap=None):
     return float(lo + R * m_up)
 
 
-def ucb_mean_upper(x, delta, lo=-1.0, hi=1.0, method=None):
-    """One-sided (1-delta) upper bound on E[x] for observations known to lie in [lo, hi].
-    method: "t" (asymptotic; the pre-registered runs), "eb" (empirical Bernstein), "bet" (betting)."""
+def ucb_mean_upper(x, delta, lo=-1.0, hi=1.0, method=None, N=None):
+    """One-sided (1-delta) upper bound on the mean of x for observations known to lie in [lo, hi].
+    method: "t" (asymptotic; the pre-registered runs), "eb" (empirical Bernstein), "bet" (betting, i.i.d.),
+    "bet_wor" (betting for the finite-population mean under sampling without replacement; requires N).
+    N (population size) is used by "bet_wor" and, for "t", as the finite-population correction 1 - n/N."""
     method = method or BOUND
     x = np.asarray(x, float); n = len(x)
     if method == "t":
         if n < 2:
             return float("inf")
-        return float(x.mean() + t_quantile(1 - delta, n - 1) * x.std(ddof=1) / math.sqrt(n))
+        fpc = math.sqrt(max(1.0 - n / N, 0.0)) if N else 1.0
+        return float(x.mean() + t_quantile(1 - delta, n - 1) * x.std(ddof=1) * fpc / math.sqrt(n))
     if method == "eb":
         return ucb_eb(x, delta, lo, hi)
     if method == "bet":
         return ucb_bet(x, delta, lo, hi)
+    if method == "bet_wor":
+        if N is None:
+            raise ValueError("bet_wor needs the population size N")
+        return ucb_bet(x, delta, lo, hi, N=N)
     raise ValueError(method)
 
 
-def ucb_pairs(U, cand, alpha_prime, lo=-1.0, hi=1.0, method=None):
+def ucb_pairs(U, cand, alpha_prime, lo=-1.0, hi=1.0, method=None, N=None):
     """Vector of one-sided UCBs for mu_j - mu_cand from paired utilities U (n, M) in [0,1]; the paired
     difference lies in [lo, hi] (default [-1, 1]; pass a tighter known range when available)."""
     D = U - U[:, [cand]]
-    ucb = np.array([ucb_mean_upper(D[:, j], alpha_prime, lo, hi, method) for j in range(U.shape[1])])
+    ucb = np.array([ucb_mean_upper(D[:, j], alpha_prime, lo, hi, method, N) for j in range(U.shape[1])])
     ucb[cand] = -np.inf
     return ucb
+
+
+def ucb_finite_population(x_known, x_sample, N, delta, lo, hi, method):
+    """Upper bound on the finite-population mean over N units when n_k units are fully known (x_known) and the
+    remaining N - n_k units are represented by a uniformly random WoR sample x_sample:
+        mu_N = (sum(x_known) + (N - n_k) * mu_rest) / N,   mu_rest bounded by ucb_mean_upper(x_sample, ..., N - n_k).
+    Used for the split certificate under the population estimand (the labelled training half is known exactly)."""
+    x_known = np.asarray(x_known, float); nk = len(x_known); N_rest = N - nk
+    if N_rest <= 0:
+        return float(x_known.mean())
+    u_rest = ucb_mean_upper(x_sample, delta, lo, hi, method, N=N_rest)
+    return float((x_known.sum() + N_rest * u_rest) / N)
 
 
 def ht_range(w, pi):

@@ -223,7 +223,10 @@ def main():
     ap.add_argument("--train_names", nargs="+", default=["nfcorpus", "scifact", "arguana", "cqadupstack-android"])
     ap.add_argument("--cand_on", choices=["val", "train"], default="val", help="where the split certificates pick the candidate")
     ap.add_argument("--truth", choices=["remainder", "population"], default="remainder", help="estimand used to score wrong certificates")
-    ap.add_argument("--bound", choices=["t", "eb", "bet"], default="t", help="human-only bound: asymptotic t or finite-sample (eb/bet)")
+    ap.add_argument("--ntr_fixed", type=int, default=0, help="split design with a FIXED training half of this many queries (0 = pre-registered T//2); "
+                    "lets the validation sample grow to the whole population, which is what an exact finite-population certificate needs")
+    ap.add_argument("--bound", choices=["t", "eb", "bet", "bet_wor"], default="t",
+                    help="human-only bound: asymptotic t or finite-sample (eb / bet i.i.d. / bet_wor: exact finite-population WoR, split_fp arms only)")
     a = ap.parse_args()
     global NAMES, JUDGE, MENU, LOOKS, CAND_ON, TRUTH
     JUDGE = a.judge; CAND_ON = a.cand_on; TRUTH = a.truth; cert.BOUND = a.bound
@@ -234,7 +237,7 @@ def main():
         MENU = MENU4
     if a.names:
         NAMES = a.names
-    variant = ("" if a.cand_on == "val" else "_candtrain") + ("" if a.truth == "remainder" else "_pop") + ("" if a.bound == "t" else "_" + a.bound)
+    variant = ("" if a.cand_on == "val" else "_candtrain") + ("" if a.truth == "remainder" else "_pop") + ("" if a.bound == "t" else "_" + a.bound) + (f"_ntr{a.ntr_fixed}" if a.ntr_fixed > 0 else "")
     out = a.out or os.path.join(HUB, "05_results", "planner_v2", a.stack + ("" if a.judge == "rr" else "_" + a.judge) + ("_menu4" if a.menu4 else "") + variant); os.makedirs(out, exist_ok=True)
     cand_dir = os.path.join(a.pools, a.stack, "runs", "candidates")
     data = load_with_judge(cand_dir)
@@ -255,7 +258,7 @@ def main():
         HJ = bc.build_structs(jd, held, P[held]); finalize(HJ, reg); attach_rr(HJ, data[held]["judge"], P[held])
         assert [s["qid"] for s in H] == [s["qid"] for s in HJ]
         cert.prepare_gate(H)
-        n = len(H); cap = n // 2
+        n = len(H); cap = n // 2 if a.ntr_fixed <= 0 else n - 1
         looks = [t for t in LOOKS if t <= cap] or [cap]
         _, tau_star, _ = fit_params(H)
         diags[held] = judge_diagnostics(H, HJ, data[held]["rr"], data[held]["rel"], c_star, tau_star)
@@ -269,7 +272,8 @@ def main():
             # independent bootstrap streams per method so adding a method never perturbs another's numbers
             rng_m = {m: np.random.default_rng([5_000_000 + 1000 * rep + salt, zlib.crc32(m.encode())])
                      for m in ["recal", "loo_boot", "loo_sim"]}
-            state = {m: None for m in ["recal_bp", "recal_ep", "recal_bpx", "recal_bpu", "recal_bpxu", "loo_boot", "loo_sim", "split_t", "split_ppi", "split_auto"]}
+            state = {m: None for m in ["recal_bp", "recal_ep", "recal_bpx", "recal_bpu", "recal_bpxu", "loo_boot", "loo_sim", "split_t", "split_ppi", "split_auto",
+                                       "split_fp", "split_fp_ppi"]}
             auto_used = None
             for T in looks:
                 probe = [H[i] for i in perm[:T]]
@@ -317,7 +321,7 @@ def main():
                             state["loo_sim"] = ("act", T, dict(pick=cand, c_hat=c_hat, tau_i=tau_i, th_i=th_i))
                 # ---- split designs ----
                 if state["split_t"] is None or state["split_ppi"] is None or state["split_auto"] is None:
-                    ntr = T // 2
+                    ntr = T // 2 if a.ntr_fixed <= 0 else min(a.ntr_fixed, T // 2)
                     train = [H[i] for i in perm[:ntr]]; val = [H[i] for i in perm[ntr:T]]
                     c_tr, tau_tr, _ = fit_params(train); th_tr = fit_theta(train)
                     U = menu_utils(val, c_tr, tau_tr, th_tr)
@@ -326,9 +330,37 @@ def main():
                     # --cand_on train chooses it on the training half, matching the manuscript's Proposition B text.
                     cand = cert.pick_candidate(U) if CAND_ON == "val" or ntr < 3 else cert.pick_candidate(menu_utils(train, c_tr, tau_tr, th_tr))
                     if state["split_t"] is None:
-                        ucb = cert.ucb_pairs(U, cand, a_sel_sim, -1.0, 1.0, cert.BOUND)
+                        ucb = cert.ucb_pairs(U, cand, a_sel_sim, -1.0, 1.0, "t" if cert.BOUND == "bet_wor" else cert.BOUND)
                         if ucb.max() <= EPS_SEL:
                             state["split_t"] = ("act", T, dict(pick=cand, c_hat=c_tr, tau_i=tau_tr, th_i=th_tr))
+                    # ---- finite-population split certificates (review 2026-09-14, direction 2, limited scope) ----
+                    # Estimand: mean over all N target queries. The training half is fully labelled (known exactly); the
+                    # validation half is a uniformly random WoR sample of the remaining N - ntr queries, so
+                    #   mu_N(D_j) = (sum_train D_j + (N - ntr) * mu_rest(D_j)) / N
+                    # and mu_rest is bounded with cert.BOUND (t with FPC / bet i.i.d. / bet_wor exact). The judge arm
+                    # bounds the rectifier D_j - lam * Dhat_j (range [-1-lam, 1+lam]) with lam fitted on the TRAIN half only
+                    # and adds the exactly known population mean of lam * Dhat_j.
+                    if state["split_fp"] is None or state["split_fp_ppi"] is None:
+                        U_tr = menu_utils(train, c_tr, tau_tr, th_tr)
+                        Uh_all_fp = menu_utils(HJ, c_tr, tau_tr, th_tr)
+                        D_tr = U_tr - U_tr[:, [cand]]; D_val = U - U[:, [cand]]
+                        Dh_all = Uh_all_fp - Uh_all_fp[:, [cand]]; Dh_tr = Dh_all[perm[:ntr]]; Dh_val = Dh_all[perm[ntr:T]]
+                        ucb_fp = np.full(len(MENU), -np.inf); ucb_fpp = np.full(len(MENU), -np.inf)
+                        for j in range(len(MENU)):
+                            if j == cand:
+                                continue
+                            ucb_fp[j] = cert.ucb_finite_population(D_tr[:, j], D_val[:, j], n, a_sel_sim, -1.0, 1.0, cert.BOUND)
+                            if ntr >= 5 and Dh_tr[:, j].var() > 0:
+                                lam_j = float(np.clip(np.cov(D_tr[:, j], Dh_tr[:, j])[0, 1] / Dh_tr[:, j].var(), 0.0, 1.0))
+                            else:
+                                lam_j = 1.0
+                            rect_tr = D_tr[:, j] - lam_j * Dh_tr[:, j]; rect_val = D_val[:, j] - lam_j * Dh_val[:, j]
+                            u_rect = cert.ucb_finite_population(rect_tr, rect_val, n, a_sel_sim, -1.0 - lam_j, 1.0 + lam_j, cert.BOUND)
+                            ucb_fpp[j] = u_rect + lam_j * float(Dh_all[:, j].mean())
+                        if state["split_fp"] is None and ucb_fp.max() <= EPS_SEL:
+                            state["split_fp"] = ("act", T, dict(pick=cand, c_hat=c_tr, tau_i=tau_tr, th_i=th_tr))
+                        if state["split_fp_ppi"] is None and ucb_fpp.max() <= EPS_SEL:
+                            state["split_fp_ppi"] = ("act", T, dict(pick=cand, c_hat=c_tr, tau_i=tau_tr, th_i=th_tr))
                     if state["split_ppi"] is None or state["split_auto"] is None:
                         Uh_all = menu_utils(HJ, c_tr, tau_tr, th_tr)
                         Uh_val = Uh_all[perm[ntr:T]]
@@ -346,7 +378,7 @@ def main():
                                 dtr, dhtr = Ut[:, ru] - Ut[:, ct], Uh_tr[:, ru] - Uh_tr[:, ct]
                                 _, lcb = nt.rho_lcb_boot(dtr, dhtr, ALPHA, rng_m["recal"], boot=400)
                                 use = (1.0 / (1 - lcb ** 2) if lcb > 0 else 1.0) > GAIN_MIN
-                            ucb_a = ucb_p if use else cert.ucb_pairs(U, cand, a_sel_sim, -1.0, 1.0, cert.BOUND)
+                            ucb_a = ucb_p if use else cert.ucb_pairs(U, cand, a_sel_sim, -1.0, 1.0, "t" if cert.BOUND == "bet_wor" else cert.BOUND)
                             if auto_used is None:
                                 auto_used = use
                             if ucb_a.max() <= EPS_SEL:

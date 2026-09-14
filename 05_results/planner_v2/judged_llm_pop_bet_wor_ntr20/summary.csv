@@ -1,0 +1,13 @@
+collection,method,act_rate,mean_T,wrong_cert_rate
+dbpedia-entity,loo_boot,1.0,67.76666666666667,0.013333333333333334
+dbpedia-entity,loo_sim,1.0,78.86666666666666,0.01
+dbpedia-entity,recal_bp,0.006666666666666667,348.3,0.0033333333333333335
+dbpedia-entity,recal_bpu,0.0,350.0,0.0
+dbpedia-entity,recal_bpx,0.006666666666666667,348.3,0.0033333333333333335
+dbpedia-entity,recal_bpxu,0.0,350.0,0.0
+dbpedia-entity,recal_ep,0.02,344.23333333333335,0.013333333333333334
+dbpedia-entity,split_auto,0.9366666666666666,136.8,0.0
+dbpedia-entity,split_fp,0.09666666666666666,337.8333333333333,0.0
+dbpedia-entity,split_fp_ppi,0.006666666666666667,350.0,0.0
+dbpedia-entity,split_ppi,0.9333333333333333,117.36666666666666,0.0
+dbpedia-entity,split_t,0.9366666666666666,136.8,0.0

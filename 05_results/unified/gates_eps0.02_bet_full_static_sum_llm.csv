@@ -1,0 +1,5 @@
+collection,J50_base,J50_oracle,J50_plugin,J50_static_v,saving_oracle,saving_plugin,recovery,wrong_plugin,saving_oracle_ex_pilot,obj_ratio_static_over_oracle,nonoverlap,pilot_share
+antique,,,,,,,,0.0,,1.9432488560583996,0.5826189037515053,0.27147684578783177
+cast19,,,,,,,,0.0,,1.9341942912071204,0.5960839405582197,0.377955834904502
+dbpedia-entity,,,,,,,,0.0,,1.5585536476405737,0.5530329545150703,0.403652934194778
+dl212223,,,,,,,,0.0,,2.4435552696151555,0.8233544613144578,0.3750153630258082
