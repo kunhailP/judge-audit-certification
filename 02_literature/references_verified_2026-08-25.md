@@ -86,3 +86,38 @@
 24. Emmenegger, Stahler, Podimata (2026). "Prediction-Powered Inference Across Many Tasks for AI Evaluation & Social Science Research." arXiv:2605.29249.
 25. Zecchin, Simeone (2024). "Adaptive Learn-then-Test: Statistically Valid and Efficient Hyperparameter Selection." arXiv:2409.15844 (venue 확인 필요 — 초안에서 언급 시 arXiv로 인용).
 26. Qwen Team (2025). "Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models." 기술 보고서/블로그. Mistral AI (2024). Mistral-7B-Instruct-v0.3 (모델 카드).
+
+## Batch 4 — 2026-09-14 추가 (외부 리뷰가 지목한 직접 경쟁 연구; arXiv/ICLR/NeurIPS 페이지에서 제목·저자 확인)
+
+27. Mani, P., Xu, P., Lipton, Z.C., Oberst, M. (2025). "No Free Lunch: Non-Asymptotic Analysis of Prediction-Powered Inference." arXiv:2505.20178.
+    유한표본에서 PPI++가 인간 라벨 단독보다 나빠지는 조건: 상관 |ρ|가 1/√(n−2)(가우시안; cross-fitting은 약 1/√(n/2−2))를 넘어야 이득.
+    — 우리 F6의 "ρ ≥ 0.55" 경험적 문턱과 §14의 always-PPI 손실은 이 결과의 사례이므로 **새 정리로 주장할 수 없고 인용·대조해야 함.**
+28. Cowen-Breen, C., Agarwal, A., Bates, S., 외 (Globerson, A. 포함) (2026). "Multiple-Prediction-Powered Inference." arXiv:2603.27414. (저자 목록은 인용 페이지에서 일부만 확인 — bib 작성 전 전체 확인 필요)
+    여러 예측원의 비용·상관 구조를 이용한 전역 표집 배분.
+29. Brawand, N., Leclerc, N., Ngo, A., Peterson, M., Vishwanath, S., Alhussein, L., Wellner, B. (2026). "Active Multiple-Prediction-Powered Inference." arXiv:2605.08429.
+    사례별 예측원 라우팅 + 잔차 불확실성 비례 라벨 표집 + 가중 최소제곱; KKT 닫힌 형태, 점근 정규성. — 판정자 선택·표집·계수 추정의 공동 설계는 이미 존재.
+30. Feng, C., Shen, M., Balashankar, A., Gerner-Beuerle, C., Rodrigues, M. (2026). "Noisy but Valid: Robust Statistical Evaluation of LLMs with Imperfect Judges." **ICLR 2026** (arXiv:2601.20913).
+    소량 인간 보정 집합으로 판정자 TPR/FPR을 추정해 임계값을 보정, **유한표본 1종 오류 통제**를 보장하는 인증 검정; PPI와의 차별점을 명시. — "불완전한 판정자로 유효한 인증"을 직접 다루므로 반드시 대조.
+31. Kilian, V., 외 (2025). "Anytime-valid, Bayes-assisted, Prediction-Powered Inference." NeurIPS 2025, arXiv:2505.18000 (기존 15번의 arXiv 번호 확인).
+    주의: 이들의 confidence sequence는 **점근적(asymptotic CS)** — 유한표본 정확 보장이 아니다. 정확 보장이 필요하면 bounded 관측에 대한 betting CS(Waudby-Smith & Ramdas 2023, JRSS-B)를 써야 한다.
+32. (추가 확인 필요) Waudby-Smith, I., Ramdas, A. (2023). "Estimating means of bounded random variables by betting." JRSS-B 86(1). — 유한표본 정확 one-sided 상한의 근거. Maurer, A., Pontil, M. (2009). "Empirical Bernstein Bounds and Sample Variance Penalization." COLT 2009.
+33. (환원 검토용, 미검증) Fiez, Jain, Jamieson, Ratliff (2019). "Sequential Experimental Design for Transductive Linear Bandits." NeurIPS 2019; Soare, Lazaric, Munos (2014). "Best-Arm Identification in Linear Bandits." NeurIPS 2014; Katz-Samuels, Jain, Karnin, Jamieson (2020). "An Empirical Process Approach to the Union Bound: Practical Algorithms for Combinatorial and Linear Bandits." NeurIPS 2020.
+    — 메뉴 전체 인증의 문서 배분 문제(문서 = arm, 비교 = 방향 벡터 w_j, 목적 max_j ‖w_j‖²_{A(π)⁻¹}/s_j²)는 transductive linear BAI의 G/XY-optimal design과 형식이 같다. 독창성 주장 전에 이 환원의 정도를 확인해야 한다.
+
+## Batch 5 — 2026-09-14 오후 (방향 1·2의 novelty bar; arXiv/NeurIPS 페이지에서 확인)
+
+34. **Ochoa Rivera, E., Tewari, A. (2024). "Optimal Thresholding Linear Bandit." arXiv:2402.09467** (stat.ML, 2024-02-11; U. Michigan). 확인됨.
+    fixed-confidence ε-Thresholding Bandit Problem in stochastic linear bandits: instance-specific sample-complexity lower bound + Lazy
+    Track-Threshold-and-Stop(Jedra & Proutiere 2020의 linear BAI 알고리즘 확장), asymptotically optimal(a.s.·기대값). 임계값 ρ 근처의
+    arm에 표집을 집중. — **우리의 min_π max_j V_j/s_j² 메뉴 인증은 "structured linear threshold certification"으로 직접 환원될 위험.**
+    Featured 기여는 (1) gold + cheap judge의 rectifier 관측 모델, (2) finite-sample certification, (3) oracle complexity C*와 adaptive
+    procedure의 회수(C_alg ≤ c·C*·polylog 또는 empirical recovery)를 함께 갖춰야 함.
+35. Fiez, T., Jain, L., Jamieson, K., Ratliff, L. (2019). "Sequential Experimental Design for Transductive Linear Bandits." NeurIPS 2019. (33번 확인 승격)
+    measurement set ≠ target set인 transductive linear bandit의 instance-dependent lower bound와 거의 matching하는 sequential design(RAGE).
+36. Soare, M., Lazaric, A., Munos, R. (2014). "Best-Arm Identification in Linear Bandits." NeurIPS 2014. (33번 확인 승격) linear BAI와 G/XY-optimal design의 관계.
+37. Waudby-Smith, I., Ramdas, A. (2020). "Confidence sequences for sampling without replacement." NeurIPS 2020.
+    finite population WoR에 대한 finite-sample·time-uniform CS. — "finite population exact certification" 자체는 새롭지 않음. 우리가 실제로 만난
+    어려움은 unequal/adaptive inclusion probability + HT weighting + 여러 공유 linear contrast + prediction-powered residual에서의 실용적 폭.
+38. Waudby-Smith, I., Ramdas, A. (2024). "Estimating means of bounded random variables by betting." JRSS-B 86(1), 1–27. (32번 확인 승격; `lib/certificates.py`의 `ucb_bet` 근거)
+39. Horvitz–Thompson under unequal probability sampling: 불편이지만 분산·범위가 1/π_i로 악화(교과서적 사실). — 방향 2의 핵심 질문
+    "Can exact finite-sample validity coexist with aggressive importance sampling?"의 배경.

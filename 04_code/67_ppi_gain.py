@@ -52,7 +52,8 @@ def main():
                 for T in a.budgets:
                     if T >= N:
                         continue
-                    se_h, se_p, lam_s = [], [], []
+                    se_h, se_p, lam_s, est_h, est_p, cov_h, cov_p = [], [], [], [], [], 0, 0
+                    z90 = cert.t_quantile(0.95, T - 1); mu_pop = float(d.mean())
                     for _ in range(a.draws):
                         idx = rng.choice(N, T, replace=False)
                         dS, dhS = d[idx], dh[idx]
@@ -62,10 +63,20 @@ def main():
                         resid = dS - lam_vec * dhS
                         se_p.append(math.sqrt(lam ** 2 * dh_out.var(ddof=1) / len(dh_out) + resid.var(ddof=1) / T))
                         lam_s.append(lam)
+                        # review 2026-09-14: track the *estimates* themselves so the gain can also be read from their
+                        # Monte-Carlo variance / MSE and the two-sided 90% intervals' coverage of the population gap
+                        eh = float(dS.mean()); ep = float(lam * dh_out.mean() + resid.mean())
+                        est_h.append(eh); est_p.append(ep)
+                        cov_h += abs(eh - mu_pop) <= z90 * se_h[-1]; cov_p += abs(ep - mu_pop) <= z90 * se_p[-1]
+                    est_h, est_p = np.array(est_h), np.array(est_p)
                     rows.append(dict(collection=held, judge=a.judge, pair=f"{MENU[ia]}_vs_{MENU[ib]}", T=T,
-                                     n_queries=N, judge_acc=acc, rho=rho, true_gap=float(d.mean()),
+                                     n_queries=N, judge_acc=acc, rho=rho, true_gap=mu_pop,
                                      se_human=float(np.mean(se_h)), se_ppi=float(np.mean(se_p)),
                                      ess_gain=float((np.mean(se_h) / np.mean(se_p)) ** 2),
+                                     mc_var_human=float(est_h.var(ddof=1)), mc_var_ppi=float(est_p.var(ddof=1)),
+                                     mc_mse_human=float(((est_h - mu_pop) ** 2).mean()), mc_mse_ppi=float(((est_p - mu_pop) ** 2).mean()),
+                                     mc_gain=float(((est_h - mu_pop) ** 2).mean() / max(((est_p - mu_pop) ** 2).mean(), 1e-12)),
+                                     cover90_human=cov_h / a.draws, cover90_ppi=cov_p / a.draws,
                                      theory_gain=float(1 / (1 - rho ** 2)) if rho == rho else float("nan"),
                                      lam_mean=float(np.mean(lam_s))))
     import pandas as pd

@@ -196,7 +196,12 @@ def ucb_bootstrap(U, cand, alpha_prime, rng, boot=400):
 
 
 def ucb_t(U, cand, alpha_prime):
-    """One-sided t UCB for mu_j - mu_cand from paired query differences."""
+    """One-sided t UCB for mu_j - mu_cand from paired query differences.
+
+    WARNING (review 2026-09-14): this is an *asymptotic* bound. With bounded, rare-event differences it is
+    anticonservative: if D=1 w.p. 0.02 and 0 otherwise (mu=0.02), n=30 and eps=0.01, all-zero samples occur
+    w.p. 0.98^30=0.545, the sample sd is 0, the UCB equals 0 and the certificate is wrong. See ucb_mean_upper
+    for finite-sample valid alternatives and _selftest() for the counterexample."""
     n = len(U)
     D = U - U[:, [cand]]
     m = D.mean(axis=0)
@@ -205,6 +210,95 @@ def ucb_t(U, cand, alpha_prime):
     ucb = m + q * sd / math.sqrt(n)
     ucb[cand] = -np.inf
     return ucb
+
+
+# ----------------------------------------------------------------------------
+# finite-sample valid one-sided upper bounds for the mean of bounded i.i.d. observations
+# ----------------------------------------------------------------------------
+BOUND = "t"          # global switch used by the certificate scripts: "t" (asymptotic) | "eb" | "bet"
+BET_GRID = 1000      # resolution of the candidate-mean grid for the betting bound
+BET_CAP = 0.75       # cap on lambda*(1-m): keeps every wealth factor strictly positive
+
+
+def ucb_eb(x, delta, lo, hi):
+    """Empirical-Bernstein one-sided upper bound (Maurer & Pontil 2009, Thm 4) for i.i.d. x in [lo, hi]:
+    mean + sqrt(2 V ln(2/delta)/n) + 7 R ln(2/delta) / (3 (n-1)),  V = sample variance (ddof=1), R = hi-lo.
+    Exact finite-sample level; loose at n <~ 500 when R is not small (see design note)."""
+    x = np.asarray(x, float); n = len(x)
+    if n < 2:
+        return float(hi)
+    R = float(hi - lo); v = float(x.var(ddof=1)); L = math.log(2.0 / delta)
+    return float(min(hi, x.mean() + math.sqrt(2 * v * L / n) + 7 * R * L / (3 * (n - 1))))
+
+
+def ucb_bet(x, delta, lo, hi, grid=None, cap=None):
+    """Betting one-sided upper confidence bound for the mean of i.i.d. x in [lo, hi]
+    (Waudby-Smith & Ramdas 2023, predictable plug-in bets, fixed-n version).
+
+    Rescale to X in [0,1]. For a candidate mean m the wealth K_n(m) = prod_i (1 + lam_i(m) (m - X_i)) with
+    predictable lam_i(m) in [0, cap/(1-m)] is a nonnegative supermartingale when E[X]=m, so by Ville's
+    inequality P(K_n(m) >= 1/delta) <= delta. m is rejected iff K_n(m) >= 1/delta; the bound is the largest
+    non-rejected grid point (rounded up to the next grid point, hence conservative). Exact finite-sample level
+    for i.i.d. bounded observations; for sampling without replacement from a finite population it is
+    conservative in the direction that matters here (the WoR mean has smaller variance)."""
+    grid = grid or BET_GRID; cap = cap or BET_CAP
+    x = np.asarray(x, float); n = len(x); R = float(hi - lo)
+    if n == 0 or R <= 0:
+        return float(hi)
+    X = (x - lo) / R
+    ms = np.linspace(0.0, 1.0, grid + 1)
+    # predictable plug-in: running mean / variance *before* observation i, with a (1/2, 1/4) prior
+    idx = np.arange(n)
+    mu_prev = np.r_[0.5, (0.5 + np.cumsum(X)) / (idx + 2)][:-1]
+    sq_prev = np.r_[0.25, (0.25 + np.cumsum((X - mu_prev) ** 2)) / (idx + 2)][:-1]
+    lam0 = np.sqrt(2 * math.log(1.0 / delta) / (sq_prev * n))
+    logK = np.zeros(len(ms)); one_m = np.maximum(1.0 - ms, 1e-12)
+    for i in range(n):
+        lam = np.minimum(lam0[i], cap / one_m)
+        logK += np.log1p(lam * (ms - X[i]))
+    ok = logK < math.log(1.0 / delta)
+    if not ok.any():
+        return float(lo)
+    j = int(np.flatnonzero(ok).max())
+    m_up = ms[min(j + 1, grid)]            # round up to the next grid point (conservative)
+    return float(lo + R * m_up)
+
+
+def ucb_mean_upper(x, delta, lo=-1.0, hi=1.0, method=None):
+    """One-sided (1-delta) upper bound on E[x] for observations known to lie in [lo, hi].
+    method: "t" (asymptotic; the pre-registered runs), "eb" (empirical Bernstein), "bet" (betting)."""
+    method = method or BOUND
+    x = np.asarray(x, float); n = len(x)
+    if method == "t":
+        if n < 2:
+            return float("inf")
+        return float(x.mean() + t_quantile(1 - delta, n - 1) * x.std(ddof=1) / math.sqrt(n))
+    if method == "eb":
+        return ucb_eb(x, delta, lo, hi)
+    if method == "bet":
+        return ucb_bet(x, delta, lo, hi)
+    raise ValueError(method)
+
+
+def ucb_pairs(U, cand, alpha_prime, lo=-1.0, hi=1.0, method=None):
+    """Vector of one-sided UCBs for mu_j - mu_cand from paired utilities U (n, M) in [0,1]; the paired
+    difference lies in [lo, hi] (default [-1, 1]; pass a tighter known range when available)."""
+    D = U - U[:, [cand]]
+    ucb = np.array([ucb_mean_upper(D[:, j], alpha_prime, lo, hi, method) for j in range(U.shape[1])])
+    ucb[cand] = -np.inf
+    return ucb
+
+
+def ht_range(w, pi):
+    """Deterministic range of the per-query Horvitz-Thompson estimate sum_{d in S} w_d y_d / pi_d for
+    y in {0,1} and any sample S: [-(sum_{w<0} |w|/pi), sum_{w>0} w/pi]. For the control-variate estimator
+    sum_d w_d j_d + sum_{S} w_d (y_d - j_d)/pi_d, with j in {0,1}, the residual (y-j) lies in {-1,0,1}, so the
+    range is [sum w j - sum |w|/pi, sum w j + sum |w|/pi]; callers pass the per-query bounds and take the
+    min/max over all target queries (fixed given the pilot) to obtain a sample-independent range."""
+    w = np.asarray(w, float); pi = np.asarray(pi, float); m = pi > 0
+    lo = -float((np.abs(w[m & (w < 0)]) / pi[m & (w < 0)]).sum()) if (m & (w < 0)).any() else 0.0
+    hi = float((w[m & (w > 0)] / pi[m & (w > 0)]).sum()) if (m & (w > 0)).any() else 0.0
+    return lo, hi
 
 
 LAMBDA_FINITE_N = False   # post-hoc deviation switch (see design doc §14); LOCK v0.4 runs use False
@@ -302,6 +396,26 @@ def _selftest():
         if simul:
             assert miss_t / R <= budget + 0.01 and miss_p / R <= budget + 0.01
     print("[PASS] simultaneous t and PPI UCBs cover under data-driven candidate choice")
+    # 3. reviewer counterexample (2026-09-14): rare-event paired difference, t bound fails, eb/bet do not
+    delta, eps, n, R = 0.10 / 30, 0.01, 30, 4000
+    wrong = dict(t=0, eb=0, bet=0)
+    for _ in range(R):
+        D = (rng.random(n) < 0.02).astype(float)                       # true mean 0.02 > eps
+        for meth in wrong:
+            wrong[meth] += ucb_mean_upper(D, delta, 0.0, 1.0, meth) <= eps
+    print(f"[INFO] rare-event counterexample (P(all zero)={0.98**n:.3f}): wrong-cert rate "
+          f"t={wrong['t']/R:.3f} eb={wrong['eb']/R:.3f} bet={wrong['bet']/R:.3f}")
+    assert wrong["t"] / R > 0.4, "t bound should fail on the counterexample"
+    assert wrong["eb"] == 0 and wrong["bet"] == 0, "finite-sample bounds must not certify here"
+    print("[PASS] eb/bet bounds do not certify the rare-event counterexample")
+    # 4. finite-sample coverage of the betting bound under a skewed bounded distribution at small n
+    miss = 0; R2 = 2000; delta = 0.05
+    for _ in range(R2):
+        D = np.clip(rng.beta(0.5, 5, 25) * 2 - 0.15, -1, 1)          # skewed, mean ~= 0.032
+        miss += ucb_bet(D, delta, -1.0, 1.0) < (2 * 0.5 / 5.5 - 0.15)
+    print(f"[INFO] betting bound miss rate at n=25, delta=0.05: {miss/R2:.4f} (budget 0.05)")
+    assert miss / R2 <= delta + 0.01
+    print("[PASS] betting bound covers at nominal level")
 
 
 if __name__ == "__main__":

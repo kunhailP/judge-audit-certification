@@ -61,26 +61,31 @@ for coll, judge, fp in blockA:
 # ---------- Block B: document-level (precision) ----------
 conv = {}
 for f in glob.glob(os.path.join(R, "active_inference", "active_*.csv")):
+    if "_v2" in f:
+        continue
     d = pd.read_csv(f)
     for c, g in d.groupby("collection"):
         conv[c] = float((g.docs_labelled / g.budget_full_eq).mean())
 def add_block(pattern, block, arms, judge_of):
     for f in glob.glob(pattern):
         d = pd.read_csv(f)
+        block_f = block + (" [v2 unique-label cost: " + os.path.basename(f).split("_v2_")[1][:-4] + "]" if "_v2_" in f else "")
         for (c, j, e), g in d.groupby(["collection", "judge", "eps"]):
             for m in arms:
                 s = g[g.method == m].sort_values("budget_full_eq")
                 if s.empty:
                     continue
-                docs = s.budget_full_eq.values * conv.get(c, np.nan)
+                # v2 result files carry the realised unique-label cost per row (Ledger); older files are converted
+                # with the per-collection docs/budget ratio of the (per-comparison-averaged) 82 outputs
+                docs = s.docs_labelled.values if "docs_labelled" in s and s.docs_labelled.notna().all() else s.budget_full_eq.values * conv.get(c, np.nan)
                 j50 = interp_first(docs, s.act.values)
-                rows.append(dict(block=block, collection=c, judge=judge_of(j, m), method=m, eps=e, J50_docs=j50, J50_queries=np.nan,
+                rows.append(dict(block=block_f, collection=c, judge=judge_of(j, m), method=m, eps=e, J50_docs=j50, J50_queries=np.nan,
                                  wrong_rate=float(s.wrong.max()), n=300, max_budget_docs=float(docs.max()), max_act=float(s.act.max())))
 jname = {"llm": "Qwen3-8B", "rr": "Qwen3-Reranker", "mistral": "Mistral-7B", "inv": "inverted"}
 add_block(os.path.join(R, "sampling_baselines", "baselines_*.csv"), "B doc-level, precision", ["uniform", "weighted", "strat_pilot", "weighted_cv"],
           lambda j, m: jname.get(j, j) if m.endswith("_cv") else "—")
 add_block(os.path.join(R, "active_inference", "active_*.csv"), "B doc-level, precision", ["ai_calib", "ai_resid", "ai_robust_0.5"], lambda j, m: jname.get(j, j))
-add_block(os.path.join(R, "menu_allocation", "menu_alloc_*.csv"), "C 4-policy menu, precision", ["static_sum", "per_pair", "adaptive", "oracle"], lambda j, m: jname.get(j, j))
+add_block(os.path.join(R, "menu_allocation", "menu_alloc_*.csv"), "C 4-policy menu, precision", ["static_sum", "per_pair", "adaptive", "oracle", "static_sum_v", "oracle_exact", "plugin_exact"], lambda j, m: jname.get(j, j))
 # ---------- Block D: document-level, set-F1 (linearised / plug-in) ----------
 for f in glob.glob(os.path.join(R, "f1_weighted", "f1_weighted_*.csv")):
     if "forceworst" in f or "boundary" in f:

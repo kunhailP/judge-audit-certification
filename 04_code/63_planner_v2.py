@@ -39,6 +39,8 @@ JUDGE_THR = 0.5
 
 
 JUDGE = "rr"   # "rr" = Qwen3-Reranker P(yes) column; "llm" = <name>_llm.csv side file (llm_p_rel)
+CAND_ON = "val"        # "val" (as pre-registered) | "train" (Proposition B as written)
+TRUTH = "remainder"    # "remainder" (as pre-registered) | "population" (finite-population mean over all N)
 
 
 def load_with_judge(cand_dir):
@@ -219,9 +221,12 @@ def main():
     ap.add_argument("--menu4", action="store_true", help="add rr_thresh (Qwen3-Reranker threshold policy) to the menu")
     ap.add_argument("--train_dir", default=None, help="candidates dir of training-only collections")
     ap.add_argument("--train_names", nargs="+", default=["nfcorpus", "scifact", "arguana", "cqadupstack-android"])
+    ap.add_argument("--cand_on", choices=["val", "train"], default="val", help="where the split certificates pick the candidate")
+    ap.add_argument("--truth", choices=["remainder", "population"], default="remainder", help="estimand used to score wrong certificates")
+    ap.add_argument("--bound", choices=["t", "eb", "bet"], default="t", help="human-only bound: asymptotic t or finite-sample (eb/bet)")
     a = ap.parse_args()
-    global NAMES, JUDGE, MENU, LOOKS
-    JUDGE = a.judge
+    global NAMES, JUDGE, MENU, LOOKS, CAND_ON, TRUTH
+    JUDGE = a.judge; CAND_ON = a.cand_on; TRUTH = a.truth; cert.BOUND = a.bound
     if a.looks:
         LOOKS = a.looks
     cert.LAMBDA_FINITE_N = bool(a.lambda_finite_n); cert.LAMBDA_GUARD = bool(a.lambda_guard)
@@ -229,7 +234,8 @@ def main():
         MENU = MENU4
     if a.names:
         NAMES = a.names
-    out = a.out or os.path.join(HUB, "05_results", "planner_v2", a.stack + ("" if a.judge == "rr" else "_" + a.judge) + ("_menu4" if a.menu4 else "")); os.makedirs(out, exist_ok=True)
+    variant = ("" if a.cand_on == "val" else "_candtrain") + ("" if a.truth == "remainder" else "_pop") + ("" if a.bound == "t" else "_" + a.bound)
+    out = a.out or os.path.join(HUB, "05_results", "planner_v2", a.stack + ("" if a.judge == "rr" else "_" + a.judge) + ("_menu4" if a.menu4 else "") + variant); os.makedirs(out, exist_ok=True)
     cand_dir = os.path.join(a.pools, a.stack, "runs", "candidates")
     data = load_with_judge(cand_dir)
     if a.train_dir:
@@ -315,9 +321,12 @@ def main():
                     train = [H[i] for i in perm[:ntr]]; val = [H[i] for i in perm[ntr:T]]
                     c_tr, tau_tr, _ = fit_params(train); th_tr = fit_theta(train)
                     U = menu_utils(val, c_tr, tau_tr, th_tr)
-                    cand = cert.pick_candidate(U)
+                    # Candidate choice (review 2026-09-14, item 4): the pre-registered runs chose the candidate on the
+                    # VALIDATION half; validity then rests on the simultaneous M(M-1) correction, not on the split.
+                    # --cand_on train chooses it on the training half, matching the manuscript's Proposition B text.
+                    cand = cert.pick_candidate(U) if CAND_ON == "val" or ntr < 3 else cert.pick_candidate(menu_utils(train, c_tr, tau_tr, th_tr))
                     if state["split_t"] is None:
-                        ucb = cert.ucb_t(U, cand, a_sel_sim)
+                        ucb = cert.ucb_pairs(U, cand, a_sel_sim, -1.0, 1.0, cert.BOUND)
                         if ucb.max() <= EPS_SEL:
                             state["split_t"] = ("act", T, dict(pick=cand, c_hat=c_tr, tau_i=tau_tr, th_i=th_tr))
                     if state["split_ppi"] is None or state["split_auto"] is None:
@@ -337,7 +346,7 @@ def main():
                                 dtr, dhtr = Ut[:, ru] - Ut[:, ct], Uh_tr[:, ru] - Uh_tr[:, ct]
                                 _, lcb = nt.rho_lcb_boot(dtr, dhtr, ALPHA, rng_m["recal"], boot=400)
                                 use = (1.0 / (1 - lcb ** 2) if lcb > 0 else 1.0) > GAIN_MIN
-                            ucb_a = ucb_p if use else cert.ucb_t(U, cand, a_sel_sim)
+                            ucb_a = ucb_p if use else cert.ucb_pairs(U, cand, a_sel_sim, -1.0, 1.0, cert.BOUND)
                             if auto_used is None:
                                 auto_used = use
                             if ucb_a.max() <= EPS_SEL:
@@ -348,7 +357,10 @@ def main():
                 if state[key] is None:
                     state[key] = ("abstain", looks[-1], dict(c_hat=c_hat, tau_i=tau_i, th_i=th_i))
             for key, (action, T, pl) in state.items():
-                ev = [H[i] for i in perm[T:]]
+                # Estimand (review 2026-09-14, item 4): the pre-registered runs scored the certificate against the mean
+                # over the never-audited complement (TRUTH="remainder"); the document-level scripts use the finite
+                # population mean over all N target queries. --truth population aligns the two.
+                ev = [H[i] for i in perm[T:]] if TRUTH == "remainder" else H
                 if key.startswith("recal"):
                     loss = abs(cert.u_gate_at(ev, pl["c_hat"])[0] - float(np.mean([s["f_adc"] for s in ev])))
                     eps = EPS_CAL; picked = "ad_probe"
