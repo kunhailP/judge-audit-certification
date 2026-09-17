@@ -22,6 +22,8 @@
   single-pilot rule (PILOT_RULE_single_eps*.csv).
 - LOCK v0.7 (NeuCLIRBench, English mono, 105 topics; commits 1750865 lock text -> b833065 rr/inv predictions -> ad91bfd Qwen3-8B
   predictions -> audit). Nothing in the rule was changed. Scores: PILOT_RULE_neuclir_*_eps*.csv, PILOT_RULE_single_neuclir_*.csv,
-  neuclir_scores/. Pre-registered criteria: (a) rule within 2 points of the better always-policy: met in 11 of 12 cells (miss:
-  Qwen3-8B, pilot 20, eps=0.01: rule 2.3% vs always-CV 5.3%); (b) inverted judge adopted by <=10% of pilots: met in 1 of 4 cells
-  (6.9%, 11.6%, 11.9%, 14.7%; the adoptions cost nothing because lambda -> 0). Reported as is.
+  neuclir_scores/. Pre-registered criteria, tallied exactly as written (corrected after an external re-count, 2026-09-17): (a) rule never more than
+  2 points below the better of always-CV / always-weighted: met in 9 of 12 cells (misses: Qwen3-8B pilot 20 eps=0.01, 2.35% vs 5.26%;
+  inverted pilot 20 eps=0.01, 0.09% vs 2.73%; reranker pilot 10 eps=0.01, 0.56% vs 2.79%); (b) inverted judge adopted by <=10% of
+  pilots: met in 1 of 4 cells (6.9%, 11.6%, 11.9%, 14.7%). The lock required both in every setting: NOT MET. An earlier note here
+  said 11 of 12 for (a); that count had excluded two sub-5% gains of judges the rule ignores, which the lock did not allow.
