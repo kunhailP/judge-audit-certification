@@ -1219,7 +1219,7 @@ coef-1 CV + inv on ANTIQUE: −5.1 [−8.8,−1.6] → 진짜 손실; λ-fit이 
 절차: (a) pilot 20 query만으로 v_pilot·slack 계산 → 예측 파일 커밋(해시 고정), (b) 81 전체 실행, (c) 97로 채점. 예측 자체가 코드로 결정되므로 "사전 등록"은 예측 파일의 커밋 시점으로 증명.
 
 ### 16.8 Held-out 검증 1차 — TREC-COVID(50 query)·Touché 2020(49 query), reranker 판정자 (2026-09-17)
-프로토콜: `81 --predict_only`로 pilot 기록만 생성 → `98_heldout_predict.py`로 예측 고정·커밋(7deb082; 수정본 ff6f6df) → 감사(300 draws, 예산 2–45) → `97`로 채점.
+프로토콜: `81 --predict_only`로 pilot 기록만 생성 → `98_heldout_predict.py`로 예측 고정·커밋(54deba0; 수정본 9ca0f6b) → 감사(300 draws, 예산 2–45) → `97`로 채점.
 예측 기록과 감사의 pilot 열은 정확히 일치(차이 0). 첫 lock의 98에 slack 제곱 누락 버그가 있었고(L_post만 영향), LOCK_NOTE.md에 공개.
 결과 파일: `05_results/heldout/PILOT_RULE_rr_{ho,ho10}_eps*.csv`, `PREDICTIONS_rr*.md`.
 
@@ -1240,7 +1240,7 @@ dev의 CAsT·DBpedia에서는 여전히 ~2배 과소 — 그 두 collection은 �
 (plain 0.037/0.039 → 교차적합 0.023/0.025). 교차적합(v4)은 낙관을 없애 오권고 0이 되지만 slack이 작을 때 불안정. 논문에는 v3를 "개선안", v4를 "보수적 변형"으로.
 결정 규칙의 요약: 오권고를 피하려면 v4, 누락을 피하려면 v3. dev에서 두 규칙이 일치하는 셀은 ε=.02에서 17/18(그중 15 정답), ε=.01에서 12/18(그중 11 정답); 불일치 셀은 모두 실측 절감이 문턱 5% 근처(0.03–0.06)이거나 CAsT ε=.01처럼 v4의 slack이 발산한 경우.
 
-### 16.9 Held-out 검증 2차 — Qwen3-8B 판정자, **v1–v4 모두 감사 전에 고정**(08a1120) (2026-09-17)
+### 16.9 Held-out 검증 2차 — Qwen3-8B 판정자, **v1–v4 모두 감사 전에 고정**(694e00b) (2026-09-17)
 판정 생성: `66_llm_judge.py`(이 머신, RTX 3090, COVID 4,165쌍 13분·Touché 1,858쌍 6분), 정확도 0.764/0.804(원고 0.76/0.79와 일치).
 | | pilot 20, ε=.02 | pilot 20, ε=.01 | pilot 10, ε=.02 | pilot 10, ε=.01 |
 |---|---|---|---|---|
