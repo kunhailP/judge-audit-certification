@@ -211,6 +211,14 @@ def main():
                         slack_pilot = float(min(eps - D_known[j].mean() for j in others))    # pilot estimate of the binding slack
                         j_bind = min(others, key=lambda j: eps - D_known[j].mean())
                         sb2_pilot = float(D_known[j_bind].var(ddof=1)) if len(tr) > 1 else float("nan")   # between-query variance of D (binding comparison) on the pilot
+                        # cross-fitted pilot slack (v4 predictor): the candidate chosen on one half of the pilot, the slack measured on
+                        # the other half, both ways averaged -- removes the winner's-curse optimism of a slack measured on the same
+                        # queries that chose the candidate
+                        hA, hB = tr[:len(tr) // 2], tr[len(tr) // 2:]; sx = []
+                        for h1, h2 in [(hA, hB), (hB, hA)]:
+                            U1 = wa.prec_utils([arr[k] for k in h1]); U2 = wa.prec_utils([arr[k] for k in h2]); c1 = cert.pick_candidate(U1)
+                            sx.append(float(eps - max((U2[:, j] - U2[:, c1]).mean() for j in range(M) if j != c1)))
+                        slack_xfit = float(np.mean(sx))
                         # per-comparison pilot quantities (v3 predictor: the binding comparison is the one with the largest v/s^2)
                         percomp = {}
                         for ci, j in enumerate(sorted(others)):
@@ -219,7 +227,7 @@ def main():
                         for m in ARMS:
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw, pilot=int(pilot_docs),
                                                   v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, sb2_pilot=sb2_pilot,
-                                                  n_queries=N, n_train=int(a.n_train), cand=int(cand), **percomp,
+                                                  n_queries=N, n_train=int(a.n_train), cand=int(cand), slack_xfit=slack_xfit, **percomp,
                                                   **{f"v_pilot_c{ci}": v_pilot[(m, j)] for ci, j in enumerate(sorted(others))},
                                                   **{f"v_pilot_ref_c{ci}": v_pilot[("weighted", j)] for ci, j in enumerate(sorted(others))}))
                         # replay the random-number consumption of the audit so that later draws use the same permutations as the full run
@@ -267,7 +275,7 @@ def main():
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw,
                                                   docs=int(L[m].cost), pilot=int(pilot_docs), act=int(ok), wrong=int(ok and regret > eps), regret=regret,
                                                   v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, sb2_pilot=sb2_pilot, slack_true=eps - regret,
-                                                  n_queries=N, n_train=int(a.n_train), b=int(b), n_sampled=int(len(q_w)), **percomp,
+                                                  n_queries=N, n_train=int(a.n_train), b=int(b), n_sampled=int(len(q_w)), slack_xfit=slack_xfit, **percomp,
                                                   **{f"v_pilot_c{ci}": v_pilot[(m, j)] for ci, j in enumerate(sorted(others))},
                                                   **{f"v_pilot_ref_c{ci}": v_pilot[("weighted", j)] for ci, j in enumerate(sorted(others))}))
                         for kk in cnt_alt[m]:

@@ -59,7 +59,7 @@ def main():
         pf = sorted(glob.glob(a.glob.replace("_draws.csv", "_predict.csv")))
         if pf:
             pr = pd.concat([pd.read_csv(f) for f in pf], ignore_index=True)
-            extra = [c for c in pr.columns if c in ("sb2_pilot", "n_train") or c.startswith(("slack_c", "sb2_c", "v_pilot_c", "v_pilot_ref_c"))]
+            extra = [c for c in pr.columns if c in ("sb2_pilot", "n_train", "slack_xfit") or c.startswith(("slack_c", "sb2_c", "v_pilot_c", "v_pilot_ref_c"))]
             d = d.drop(columns=[c for c in extra if c in d]).merge(pr[["collection", "judge", "budget_full_eq", "eps", "method", "draw"] + extra], on=["collection", "judge", "budget_full_eq", "eps", "method", "draw"], how="left")
         else:
             d["sb2_pilot"] = np.nan; d["n_train"] = 20
@@ -89,6 +89,8 @@ def main():
             share2 = (L2 / (L2 + P)).reindex(vr.index); pred_saving_v2 = (1 - vr) * share2
             L3 = pd.Series([cp.l_post_v3(r, z, int(g.n_queries.iloc[0]), n_tr, b_ref) for r in ref.to_dict("records")], index=ref.index) if "slack_c0" in ref else L2 * np.nan
             share3 = (L3 / (L3 + P)).reindex(vr.index); pred_saving_v3 = (1 - vr) * share3
+            L4 = pd.Series([cp.l_post_v2(v, sb, sl, z, int(g.n_queries.iloc[0]), n_tr, b_ref) for v, sb, sl in zip(ref.v_pilot, ref.sb2_pilot, ref.slack_xfit)], index=ref.index) if "slack_xfit" in ref else L2 * np.nan
+            share4 = (L4 / (L4 + P)).reindex(vr.index); pred_saving_v4 = (1 - vr) * share4
             obs_cost_ratio = (J[m] - P) / (J[REF] - P); obs_saving = 1 - J[m] / J[REF]
             rows.append(dict(collection=c, judge=j, eps=a.eps, method=m, pilot=P, J50_ref=J[REF], J50=J[m], post_pilot_share=share,
                              vr_pred_med=float(vr.median()), vr_pred_q25=float(vr.quantile(0.25)), vr_pred_q75=float(vr.quantile(0.75)),
@@ -100,6 +102,8 @@ def main():
                              frac_draws_recommend_v2=float((pred_saving_v2 > a.tau).mean()),
                              L_post_pred_v3_med=float(L3.median()), saving_pred_v3_med=float(pred_saving_v3.median()),
                              frac_draws_recommend_v3=float((pred_saving_v3 > a.tau).mean()),
+                             L_post_pred_v4_med=float(L4.median()), saving_pred_v4_med=float(pred_saving_v4.median()),
+                             frac_draws_recommend_v4=float((pred_saving_v4 > a.tau).mean()), slack_xfit_med=float(ref.slack_xfit.median()) if "slack_xfit" in ref else np.nan,
                              frac_draws_recommend=float((pred_saving > a.tau).mean()),
                              cell_truth=int(obs_saving > a.tau),
                              slack_pilot_med=float(ref.slack_pilot.median()), slack_true_med=float(ref.slack_true.median())))
@@ -113,11 +117,13 @@ def main():
         print(f"fully pilot-based, v2 predictor (two-stage variance, known pilot part): corr = {np.corrcoef(t.saving_pred_v2_med, t.saving_obs)[0,1]:.3f}; MAE = {np.abs(t.saving_pred_v2_med - t.saving_obs).mean():.3f}")
         u = t.drop_duplicates(["collection", "judge"])
         print(f"fully pilot-based, v3 predictor (max over comparisons): corr = {np.corrcoef(t.saving_pred_v3_med, t.saving_obs)[0,1]:.3f}; MAE = {np.abs(t.saving_pred_v3_med - t.saving_obs).mean():.3f}")
-        print("post-pilot labels of weighted: realised vs v1 vs v2 vs v3 (medians): " + "; ".join(f"{r.collection}/{r.judge} {r.L_post_obs:.0f} vs {r.L_post_pred_med:.0f} vs {r.L_post_pred_v2_med:.0f} vs {r.L_post_pred_v3_med:.0f}" for r in u.itertuples()))
+        print(f"fully pilot-based, v4 predictor (v2 with cross-fitted slack): corr = {np.corrcoef(t.saving_pred_v4_med, t.saving_obs)[0,1]:.3f}; MAE = {np.abs(t.saving_pred_v4_med - t.saving_obs).mean():.3f}")
+        print("post-pilot labels of weighted: realised vs v1 vs v2 vs v3 vs v4 (medians): " + "; ".join(f"{r.collection}/{r.judge} {r.L_post_obs:.0f} vs {r.L_post_pred_med:.0f} vs {r.L_post_pred_v2_med:.0f} vs {r.L_post_pred_v3_med:.0f} vs {r.L_post_pred_v4_med:.0f}" for r in u.itertuples()))
+        print("pilot slack: plain vs cross-fitted vs true (medians): " + "; ".join(f"{r.collection}/{r.judge} {r.slack_pilot_med:.4f} vs {r.slack_xfit_med:.4f} vs {r.slack_true_med:.4f}" for r in u.itertuples()))
         u = t.drop_duplicates(["collection", "judge"])
         print(f"post-pilot labels of weighted: realised vs pilot-predicted median: " + "; ".join(f"{r.collection}/{r.judge} {r.L_post_obs:.0f} vs {r.L_post_pred_med:.0f} [{r.L_post_pred_q25:.0f}, {r.L_post_pred_q75:.0f}]" for r in u.itertuples()))
         jd = t[t.method.isin(["weighted_cvl", "weighted_cv", "ai_resid", "ai_robust_0.3", "ai_calib"])]
-        for col, lab in [("frac_draws_recommend", "share from realised J50"), ("frac_draws_recommend_pilot", "fully pilot-based v1"), ("frac_draws_recommend_v2", "fully pilot-based v2"), ("frac_draws_recommend_v3", "fully pilot-based v3")]:
+        for col, lab in [("frac_draws_recommend", "share from realised J50"), ("frac_draws_recommend_pilot", "fully pilot-based v1"), ("frac_draws_recommend_v2", "fully pilot-based v2"), ("frac_draws_recommend_v3", "fully pilot-based v3"), ("frac_draws_recommend_v4", "fully pilot-based v4")]:
             dec = (jd[col] > 0.5).astype(int)
             print(f"decision 'saving > {a.tau}' ({lab}) vs cell truth: accuracy {(dec == jd.cell_truth).mean():.2f} on {len(jd)} judge cells; "
                   f"false recommendations {int(((dec == 1) & (jd.cell_truth == 0)).sum())}, missed {int(((dec == 0) & (jd.cell_truth == 1)).sum())}")
