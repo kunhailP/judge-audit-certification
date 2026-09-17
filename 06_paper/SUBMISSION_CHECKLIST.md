@@ -48,7 +48,7 @@ TMLR 저자 지침: https://jmlr.org/tmlr/author-guide.html
 
 ## 4. 익명성·보조자료
 
-- [ ] 공개 GitHub 저장소(`kunhailP/…`)는 개인 계정 → **논문·보조자료 어디에도 링크하지 말 것.** 리뷰용 코드는 익명 zip(≤100MB, `.git` 제거)으로 OpenReview 보조자료에 첨부. 현재 크기: `05_results` 50MB, `04_code` 2.2MB, `06_paper` 6.3MB → 합계 약 60MB로 한도 안.
+- [ ] 공개 GitHub 저장소(personal account)는 개인 계정 → **논문·보조자료 어디에도 링크하지 말 것.** 리뷰용 코드는 익명 zip(≤100MB, `.git` 제거)으로 OpenReview 보조자료에 첨부. 현재 크기: `05_results` 50MB, `04_code` 2.2MB, `06_paper` 6.3MB → 합계 약 60MB로 한도 안.
 - [ ] 보조자료 zip 생성 전 `04_code/90_make_release.py` 갱신: 현재 목록에 `LOCK_v0.6`, `89_antique_pool.py`, `91_antique_report.py`, `05_results/primary_antique`가 빠져 있음(저장소에는 수동으로 들어간 상태). README의 "`88` — pre-registered report"도 `88/91`로.
 - [ ] 보조자료 zip 안의 `01_design/PAPER_2027_DESIGN_v0.1.md` 등 한국어 개발 로그를 포함할지 결정(익명성 문제는 없으나 리뷰어 접근성).
 - [ ] 사전등록 lock 문서의 "커밋 시각" 증거: 공개 저장소는 1커밋뿐이라 lock이 데이터 분석 전에 커밋됐음을 저장소 이력으로 보일 수 없음. 원 저장소의 커밋 해시/시각을 lock 문서에 적거나(익명), OSF 등 타임스탬프 등록 고려.

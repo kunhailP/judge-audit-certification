@@ -412,7 +412,7 @@ arm `split_fp`(humans) / `split_fp_ppi`(rectifier D−λD̂, λ는 train에서�
 
 ### 12.7 데이터 아카이브
 - `pools_bundle` MANIFEST.csv(53 files, 68.5 MB, sha256) + README_DATA.md(모델·버전·출처·라이선스 주의) 생성, verify 0 problems. `emb/`(2.2 GB 임베딩 캐시) 제외.
-- Hugging Face **private** dataset `kunhail/nonneutral-judge-audit-pools` 업로드 완료(56 files). `_texts.tsv`는 원 컬렉션 라이선스를 상속하므로 private 유지.
+- Hugging Face **private** dataset `<private Hugging Face dataset>` 업로드 완료(56 files). `_texts.tsv`는 원 컬렉션 라이선스를 상속하므로 private 유지.
 
 ### 12.8 남은 일(제출 전)
 1. 원고 전체 통독(숫자 ↔ CSV 대조는 §12.1·부록 표에 대해 완료; §3·§6 legacy 수치는 불변).
