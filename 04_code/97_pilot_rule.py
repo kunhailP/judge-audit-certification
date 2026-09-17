@@ -118,7 +118,7 @@ def main():
         n_tr = int(g.n_train.iloc[0]) if "n_train" in g and np.isfinite(g.n_train.iloc[0]) else 20
         w = g[g.method == "weighted"].set_index(["budget_full_eq", "draw"]); cvl = g[g.method == "weighted_cvl"].set_index(["budget_full_eq", "draw"])
         idx = w.index.intersection(cvl.index); w = w.loc[idx]; cvl = cvl.loc[idx]
-        L3 = np.array([cp.l_post_v3(r, z, N, n_tr, 4) for r in w.to_dict("records")]); share = L3 / (L3 + P)
+        L3 = np.array([cp.l_post_v3(r, z, N, n_tr, 4) for r in w.to_dict("records")]); share = L3 / (L3 + w.pilot.values)   # this draw's own pilot cost (review 2026-09-17)
         pred = (1 - cvl.v_pilot.values / w.v_pilot.values) * share; use = pred > a.tau
         docs = np.where(use, cvl.docs.values, w.docs.values); act = np.where(use, cvl.act.values, w.act.values); wrong = np.where(use, cvl.wrong.values, w.wrong.values)
         rr = pd.DataFrame(dict(budget=w.index.get_level_values(0), docs=docs, act=act, wrong=wrong, use=use)).groupby("budget").mean()
