@@ -6,24 +6,37 @@ case is conservative for the variance bounds below). Looks t = 1..L at sizes T_1
 S_t = {q_1..q_{T_t}} is split into A_t = first ⌊T_t/2⌋ and B_t = the rest. A judge is a fixed measurable map
 f: q ↦ (û_m(q))_{m∈M} (any AI predictor; possibly biased, adversarial, or correlated with a policy).
 
-## Proposition A (what determines the PPI effective-sample-size gain)
+## Proposition A (what determines the PPI effective-sample-size gain) — restated 2026-09-17 with finite N
 
 Fix policies j, m and let D = u_j − u_m, D̂ = û_j − û_m, with population variances σ², σ̂² and correlation ρ.
-Let n = |B| audited queries and N ≫ n unlabeled queries. The PPI++ estimator with tuning λ,
+Let n = |B| audited queries and N unlabeled queries, drawn independently. The PPI++ estimator with tuning λ,
   μ̂(λ) = λ·mean_N(D̂) + mean_n(D − λD̂),
 has variance Var(μ̂(λ)) = [σ² − 2λ ρ σ σ̂ + λ² σ̂²]/n + λ² σ̂²/N.
-At λ* = ρσ/σ̂ (N→∞) this equals σ²(1−ρ²)/n, so the effective-sample-size gain relative to the human-only
-estimator (variance σ²/n) is exactly 1/(1−ρ²). It depends on f only through ρ = corr(D, D̂): the pair-level
-accuracy of f enters only insofar as it changes ρ.
+Minimising over unconstrained λ gives λ* = ρσ / (σ̂ (1 + n/N)) and
+  V_min = (σ²/n) · (1 − ρ²/(1 + n/N)),   G = 1 / (1 − ρ²/(1 + n/N)),
+which increases to 1/(1−ρ²) as N/n → ∞. At the optimum the judge enters only through ρ and n/N. This is PPI++
+(Angelopoulos et al. 2023) written for a paired difference; it is the reference curve of F4, not a new result.
 
-Proof. Direct computation of the variance of a linear combination of the two independent sample means; minimize the
-quadratic in λ. ∎
+Proof. Direct computation of the variance of a linear combination of the two independent sample means; minimise the
+quadratic in λ (its minimiser is Cov(D,D̂)/((1+n/N) Var(D̂))). ∎
 
-Remark (policy-correlated judge). Write û_m = u_m + b_m + e_m with a policy-specific bias b_m(q) and noise e_m.
-Then D̂ = D + (b_j − b_m) + (e_j − e_m). A bias that is *common* to j and m cancels; a bias that differs between the
-two policies — e.g. one concentrated on documents that only policy j retrieves — enters D̂ and lowers ρ whenever
-Var(b_j − b_m) is not small relative to Var(D). This is the mechanism measured in §12.2 (identical-model judge:
-paired bias −0.14, ρ 0.57 → 0.25).
+Qualifications (what the formula does not cover).
+1. G is the gain at the oracle λ*; the implementation cross-fits λ on halves of B and the estimation noise costs part of
+   the gain at small n (`crossfit_lambda`, certificates.py).
+2. The implementation clips λ to [0,1]. A judge with ρ < 0 would help an unconstrained estimator but is switched off
+   (λ = 0); when ρσ/σ̂ > 1 + n/N the clipped λ = 1 delivers less than G. So the realised gain is a function of (ρ, σ/σ̂,
+   n/N, estimation noise), not of ρ alone.
+3. G is a variance ratio; the certificate is a threshold event on a bound. F6 measures that separately.
+
+Remark (bias toward a policy vs. ρ) — corrected 2026-09-17. Write û_m = u_m + b_m + e_m with a policy-specific bias
+b_m(q) and a query-level error e_m(q); then D̂ = D + (b_j − b_m) + (e_j − e_m). A *constant* differential bias
+b_j − b_m shifts every D̂ by the same amount, leaves ρ unchanged (D̂ = D + 0.1 has ρ = 1) and is removed exactly by the
+control variate. What lowers ρ is the query-varying part (b_j(q) − b_m(q)) + (e_j − e_m) relative to Var(D) and its
+covariance with D. Hence two separate consequences of a policy-correlated judge: a *mean bias*, which corrupts
+judge-only comparisons but not the corrected estimator (measured: −0.14 F1 for the identical-model judge, §12.2), and a
+*loss of predictive correlation*, which costs efficiency. The earlier remark ("a bias that differs between the two
+policies lowers ρ") conflated the two; the ρ drop 0.57 → 0.25 for pairs involving rr_thresh appears for every judge,
+biased or not, so it is mostly a property of that policy's paired differences.
 
 ## Proposition B′ (conditional validity of the split certificate, any judge)
 
@@ -35,8 +48,11 @@ be U_{t,j} = μ̂_{t,j} + z_{α'} · ŝe_{t,j}, computed on B_t only, where
        vice versa) and clipped to [0,1]; mean_N(D̂_j) taken over target queries outside B_t;
 and α' = α / (L · |M|(|M|−1)).
 
-Claim. Conditionally on 𝒢_t, and for every fixed f, E[μ̂_{t,j} | 𝒢_t] = μ_j − μ_{m̂_t}, and U_{t,j} is a level-(1−α')
-upper confidence bound for μ_j − μ_{m̂_t} up to the t-approximation of the sampling distribution of the mean.
+Claim (restated 2026-09-17). For every *fixed* ordered pair (j, m), conditionally on 𝒢_t and for every fixed f,
+E[μ̂_{t,j,m} | 𝒢_t] = μ_j − μ_m, and U_{t,j,m} is a level-(1−α') upper confidence bound for μ_j − μ_m up to the
+t-approximation of the sampling distribution of the mean. The candidate m̂_t (chosen on A_t, on B_t, or on both) enters
+only through which member of the fixed family {(j, m)} is read off; the estimator of the *selected* contrast (j, m̂_t)
+is not claimed to be unbiased and need not be — validity comes from simultaneous coverage of the fixed family.
 Consequently, with ACT_t := {max_{j≠m̂_t} U_{t,j} ≤ ε},
    P( ∃t: ACT_t and μ_{best} − μ_{m̂_t} > ε ) ≤ α,
 regardless of f, of the adoption rule, and of whether the ρ-based adoption score covers its target.

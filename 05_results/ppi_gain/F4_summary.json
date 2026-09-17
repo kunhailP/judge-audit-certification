@@ -1,0 +1,50 @@
+{
+ "n_settings": 54,
+ "corr_gain_rho": 0.7548907445598588,
+ "corr_gain_acc": 0.026091954305496504,
+ "n_groups": 14,
+ "corr_within_demeaned": 0.659070265405722,
+ "n_groups_positive": 13,
+ "within": {
+  "arguana/rr": 0.37466813727154896,
+  "cqadupstack-android/rr": -0.08826084969151292,
+  "dbpedia-entity/llm": 0.9991784742738804,
+  "dbpedia-entity/rr": 0.9730161225660047,
+  "dl2019/llm": 0.9978894811795431,
+  "dl2019/rr": 0.9925201851824019,
+  "dl2020/llm": 0.9990697857408255,
+  "dl2020/rr": 0.9959779277101168,
+  "nfcorpus/rr": 0.7432560247794185,
+  "scifact/rr": 0.9870240519363582,
+  "trec-covid/llm": 0.9984205328846569,
+  "trec-covid/rr": 0.4217460111206575,
+  "webis-touche2020/llm": 0.9024586407462422,
+  "webis-touche2020/rr": 0.9544665146994866
+ },
+ "judge_swap_rho_up": 13,
+ "judge_swap_gain_up": 13,
+ "n_mc": 33,
+ "corr_mc_gain_rho": 0.7847223065136306,
+ "corr_se_gain_rho_on_mc": 0.8305996594475901,
+ "median_abs_diff": 0.034179202695855504,
+ "T10": {
+  "n": 54,
+  "corr_gain_rho": 0.7548907445598588,
+  "corr_gain_acc": 0.026091954305496504
+ },
+ "T20": {
+  "n": 12,
+  "corr_gain_rho": 0.7831901653687693,
+  "corr_gain_acc": 0.4926134349148817
+ },
+ "T30": {
+  "n": 54,
+  "corr_gain_rho": 0.4131961650314977,
+  "corr_gain_acc": 0.22093674134644647
+ },
+ "T90": {
+  "n": 30,
+  "corr_gain_rho": 0.8588451962657366,
+  "corr_gain_acc": -0.15752887841049185
+ }
+}

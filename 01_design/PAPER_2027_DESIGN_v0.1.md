@@ -1070,3 +1070,49 @@ pilot 회귀 λ(∈[0,1])를 CV 계수로 쓰면 적대적 판정자의 손실(+
 - 정확도 0.47의 판정자가 ρ 0.59로 J50을 26% 줄였다: 판정자 임계 보정 없이도 CV가 작동한다(불편성·λ가 처리).
 - 세 사전 등록 평가의 유효성 통과는 이제 3/3, 효율의 사전 기준은 3/3 미충족(원인: 조건 미달, 격자 과소, 천장)이지만
   J50 병기 기준은 v0.6에서 통과. 원고에는 이 전체를 그대로 쓴다.
+
+## 15. 정합성 점검과 기준선 보강 준비 (2026-09-17, featured-prep, e6bbbad 이후)
+
+목표 재확인: 이 논문은 **TMLR(Featured 목표)** 로 완성하고, ICML용 후속 연구는 게재 확정 후 별도로 준비한다. 핵심 기여로 미는 질문은
+"판정자를 활용한 추정의 개선이 언제 실제 인간 검증 비용 절감으로 이어지고, 언제 이어지지 않으며, 감사 전에 판단할 수 있는가".
+
+### 15.1 저장된 결과와 원고의 불일치 — 확인 결과 (모두 커밋된 CSV에서 재계산, `93_plot_F4.py`가 재생성)
+| 항목 | 원고(e6bbbad) | 현재 CSV | 조치 |
+|---|---|---|---|
+| F4 54점 corr(gain, ρ) / corr(gain, acc), T=10 | 0.78 / −0.02 | **0.7549 / +0.0261** | 초록·기여·§3·F4 캡션 갱신. 원인: d678bc7→e6bbbad에서 legacy/modern/judged_rr CSV가 재실행(MC-MSE 열 추가)됐는데 본문 집계값은 이전 결과(0.7818/−0.0154)였음 |
+| 집단 내(collection×judge 14개) demeaned corr / 양수 집단 수 | 0.66 / 14개 전부 | 0.659 / **13개** (cqadupstack-android·rr −0.09: ρ −0.17~0.07, 이득 전부 <1) | "13 of 14"로 수정, 예외 명시 |
+| 판정자 교체(rr→llm)에서 ρ↑ 13건 중 이득↑ | 13/13 | 13/13 | 유지 |
+| 33점 MC-MSE gain corr / 추정-SE corr / 중앙값 차 | 0.78 / 0.83 / 0.03 | 0.7847 / 0.8306 / 0.034 | 유지 |
+| F6 "ρ≥0.55·N_unlab≥2T·ε≤0.02 모두 만족할 때만 >1.2, 그 외 0.9–1.05" | — | **반례**: ρ=0.641, N_unlab=100, ε=0.01, T=90 → 1.376; ρ=0.57·N=300·ε=0.02 → 1.11(<1.2); ρ≤0.39 범위 0.76–1.06 | 문단·캡션을 저장값 그대로 서술(§15.2) |
+| DL 21–23 rho_map 최대 비율 | "no cell shows a gain" | 1.045 | "no cell above 1.05" |
+
+### 15.2 원고 수정 (main.tex, 재컴파일 확인)
+1. 초록을 약 620단어 → 약 420단어로 압축, 위 수치 동기화.
+2. **Prop. A**: 유한 N 형태로 재기술 — λ* = ρσ/(σ̂(1+n/N)), V_min = σ²/n·(1−ρ²/(1+n/N)), G = 1/(1−ρ²/(1+n/N)) → N/n→∞에서 1/(1−ρ²).
+   "PPI++를 이 문제에 적용한 기준식"으로 위치 지정. 세 가지 유보(λ 추정 오차, λ∈[0,1] clip으로 음의 ρ는 λ=0, 분산≠인증 사건) 명시. 부록 증명 동기화.
+3. **편향→ρ 설명 정정**: 상수 차등 편향 b_j−b_m은 ρ를 바꾸지 않고(D̂=D+0.1이면 ρ=1) CV가 정확히 제거. ρ를 낮추는 것은 query별로 변하는 오차와 그 공분산.
+   "평균 편향(판정자 단독 비교를 망침)"과 "예측 상관 손실(보정 후 효율을 낮춤)"을 분리. THEORY_v0.1.md 동일 수정.
+4. **Prop. B**: 불편성은 *고정된* 순서쌍 (j,m)에 대해서만 주장; 선택된 대비 (j, m̂_t)의 추정량은 불편하다고 주장하지 않음; 후보 선택은 고정 집합의 동시 coverage로 처리.
+   세 주장(고정 대비 불편성 / 선택 후 안전 인증 / 유한표본 수준)과 각각의 가정을 분리한 세 번째 remark 추가.
+5. **고정 예산 vs 순차 인증**: §2 효율 지표를 두 설계로 분리 정의(순차 query 단위: 누적 ACT; 고정 예산 문서 단위: L=1, α'=α/(M(M−1)), 예산별 인증 확률, J50 = 50% 도달 예산).
+   Table 2 캡션·§5.3 "Design" 문단·Limitations에 "사전 확정 예산의 비용이지 순차 정지 비용이 아님" 명시.
+6. **uniform 기준선의 혼합 효과**: uniform은 결정 가중치 0인 문서에도 라벨을 씀 → −40~−56%는 "불필요 문서 제외 + 가중 표집"의 합. §5.3에 명시하고
+   분리 기준선(`uniform_nz`)은 실행 후 행 추가(main.tex의 `% TODO(2026-09-17)`).
+7. **Exact bound 범위 서술**: 부록 E의 "paired precision difference에는 사전 범위가 없다" → 실험은 set-F1·범위 [−1,1] 사용; nested cutoff의 precision 차이는
+   ±(1−k_a/k_b)로 사전에 알 수 있음(k_a=10,k_b=20 → [−0.5,0.5]); set-F1은 n_G에 의존해 label-free가 아님. Table 6은 "이 bound·느슨한 범위"의 비용.
+8. **사전등록 서술**: 공개 이력의 초기 release 커밋에 lock과 결과가 함께 있으므로, 시점 증거는 날짜가 적힌 lock 문서와 개발 로그이며 self-reported임을 재현 노트에 명시.
+9. F4 그림을 현재 CSV로 재생성(`93_plot_F4.py`, `05_results/ppi_gain/F4_summary.json`).
+
+### 15.3 코드 (실행은 pools bundle이 있는 GPU 머신에서)
+- `81_sampling_baselines.py`: arm **`uniform_nz`** 추가 — 결정 가중치가 어느 비교에서든 0이 아닌 문서(공유 표집이면 비교별 support의 합집합) 안에서 균등 표집.
+  `--dump_draws`로 (draw, arm)별 고유 라벨 비용·인증 결과를 `*_draws.csv`에 기록. 합성 pool 스모크 테스트 통과(arm 순서: uniform, uniform_nz, weighted, …).
+- `86_table2_v2.py`: `uniform_nz` 행("Uniform over decision-relevant documents (humans)"), 없는 행은 건너뜀. `84_unify_metrics.py`에도 추가.
+- `94_j50_ci.py`: `*_draws.csv`에서 draw 인덱스를 (예산별로) 재표집하되 모든 arm에 같은 인덱스를 적용해 pairing을 유지, J50과 절감률
+  (uniform→uniform_nz, uniform_nz→weighted, uniform→weighted, weighted→weighted_cvl 등)의 부트스트랩 95% 구간·MC SE 출력 → `05_results/unified/J50_CI_eps*.csv`.
+- 재실행 명령(v3 격자와 동일, `_v3b{B}` 태그 규약): `RUN_REVISED_ACCOUNTING.sh`의 81 호출에 `--dump_draws`를 붙여 예산별로 실행한 뒤
+  `python3 86_table2_v2.py v3 && python3 94_j50_ci.py --eps 0.02 && python3 94_j50_ci.py --eps 0.01`.
+  판독 기준: uniform→uniform_nz가 절감의 대부분이면 "가중치"보다 "결정 관련 문서 식별"이 기여의 중심; uniform_nz→weighted가 크면 |w| 비례 표집 자체의 가치.
+
+### 15.4 다음 단계 (Featured를 가르는 부분)
+- 3단계: pilot·후보 선택·slack 분석을 "감사 전 판단 규칙"(입력: pilot의 ρ 추정, N_unlab, pilot 비용, 추정 margin, bound 종류 → 출력: judge CV / 인간 단독 가중 표집 / 복잡한 배분 중 선택)으로
+  묶고, 고정한 예측을 별도 collection에서 검증. 기존 PPI·active inference 문헌이 이미 제공하는 판단과 대조하는 것이 선행.
