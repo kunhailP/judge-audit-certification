@@ -17,7 +17,7 @@ information is the commit author field, which the services below hide).
    currently carries no link). Mention in the form that the commit history (lock timestamps) will be made public on acceptance.
 
 ## Option 2: supplementary zip on OpenReview (no link at all)
-`06_paper/make_supplementary.sh` builds `judge-audit-supplementary.zip` from the tree without the release assets and without
+`SUPP_IDENT_REGEX='<account>|<e-mail>|<surname>' 06_paper/make_supplementary.sh` builds `judge-audit-supplementary.zip` and reports any file that still contains one of the terms (the terms are passed in, never stored in the tree) from the tree without the release assets and without
 `.git`; it is about 10 MB and contains everything needed to regenerate every table and figure from the committed result files.
 Upload it as supplementary material. State that the full history with lock timestamps is released on acceptance.
 
