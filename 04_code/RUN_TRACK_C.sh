@@ -20,7 +20,7 @@ CFG=(
   "judged  dbpedia-entity llm,rr       5 10 15 20 30 45 60 90 120 150 200"
   "dlv2    dl212223       llm          5 10 15 20 30 45 60 90"
 )
-run() { local name; name=$(echo "$*" | tr ' /' '__' | cut -c1-120); echo "[start] $*"; nohup python3 "$@" > "$LOG/$name.log" 2>&1 & }
+run() { local name; name="81_${stack}_${judge}_b${B}"; echo "[start] $*"; nohup python3 "$@" > "$LOG/$name.log" 2>&1 & }
 
 for line in "${CFG[@]}"; do
   read -r stack names judges budgets <<<"$line"
