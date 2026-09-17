@@ -10,3 +10,7 @@
   regenerated after the audit had been run and are reported as such.
 - The pilot-10 variant (PREDICTIONS_rr_pilot10) was generated with the corrected formula before its audit was run.
 - Scoring: PILOT_RULE_rr_pilot20_eps*.csv (97_pilot_rule.py on the *_ho_*_draws.csv records).
+- 08a1120 — lock of the Qwen3-8B (llm) predictions for both pools, pilot 20 and pilot 10, predictors v1-v4, committed before the
+  audit; judgments generated with 66_llm_judge.py on this machine (accuracy 0.764 / 0.804, matching the manuscript's 0.76 / 0.79).
+  Audit run afterwards; pilot columns of the audit records equal the locked records (max difference 0). Scoring:
+  PILOT_RULE_llm_{ho,ho10}_eps*.csv.
