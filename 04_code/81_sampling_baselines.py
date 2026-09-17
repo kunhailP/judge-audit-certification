@@ -129,6 +129,7 @@ def main():
     ap.add_argument("--legacy", action="store_true", help="old design: per-pair draws with b docs each, cutoff pilot cost, t bound, no _v2 suffix")
     ap.add_argument("--tag", default="", help="suffix for the output file (e.g. _cvl)")
     ap.add_argument("--dump_draws", action="store_true", help="also write one row per (draw, arm) with its unique-label cost, certificate outcome and the pilot-only variance prediction (94_j50_ci.py, 97_pilot_rule.py)")
+    ap.add_argument("--predict_only", action="store_true", help="held-out protocol (design log §16.7): compute and write ONLY the pilot-based predictions of every draw (same permutations as the full run), without auditing; the file can be committed before the audit is run")
     a = ap.parse_args()
     if a.legacy:
         a.sampling, a.pilot_cost, a.bound = "per_pair", "cutoff", "t"
@@ -201,9 +202,19 @@ def main():
                     # exact paired differences of the fully labelled pilot queries (known part of the population mean)
                     D_known = {j: np.array([(wa.weights(arr[k][2], j, cand, len(arr[k][0])) * arr[k][0]).sum() for k in tr]) for j in others}
                     b_pair = b if a.legacy else max(1, b / len(others))
-                    if a.dump_draws:
+                    if a.dump_draws or a.predict_only:
                         v_pilot = pilot_predicted_variance(arr, tr, H, prob, cand, others, sd, lam_pair, a.docs_per_query)
                         slack_pilot = float(min(eps - D_known[j].mean() for j in others))    # pilot estimate of the binding slack
+                    if a.predict_only:
+                        for m in ARMS:
+                            draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw, pilot=int(pilot_docs),
+                                                  v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, n_queries=N, cand=int(cand)))
+                        # replay the random-number consumption of the audit so that later draws use the same permutations as the full run
+                        for k in q_w:
+                            n_k = len(arr[k][0])
+                            for m in ARMS:
+                                (rng_nz if m == "uniform_nz" else rng).random(n_k)
+                        continue
                     for k in q_w:
                         r, rj, ks = arr[k]; n = len(r); pj = prob[H[k]["qid"]]; qid = H[k]["qid"]
                         W, bases = make_bases(ks, cand, others, n, pj, sd)
@@ -247,6 +258,8 @@ def main():
                         for kk in cnt_alt[m]:
                             cnt_alt[m][kk] += ok_alt[kk]
                 _tick(f"cell B={Bq} eps={eps} done ({a.draws} draws)")
+                if a.predict_only:
+                    continue
                 for m in ARMS:
                     rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, act=cnt[m][0] / a.draws,
                                      wrong=cnt[m][1] / a.draws, var_est=float(np.mean(varr[m])) if varr[m] else float("nan"),
@@ -262,6 +275,8 @@ def main():
     suffix = "" if a.legacy else f"_v2_{a.sampling}_{a.pilot_cost}_{a.bound}"
     stem = f"baselines_{a.stack}_{a.judge}{'_forceworst' if a.force_worst else ''}{'_boundary' if a.boundary else ''}{a.tag}{suffix}"
     pd.DataFrame(rows).to_csv(os.path.join(out, stem + ".csv"), index=False)
+    if a.predict_only:
+        pd.DataFrame(draw_rows).to_csv(os.path.join(out, stem + "_predict.csv"), index=False); return
     if a.dump_draws:
         pd.DataFrame(draw_rows).to_csv(os.path.join(out, stem + "_draws.csv"), index=False)
 
