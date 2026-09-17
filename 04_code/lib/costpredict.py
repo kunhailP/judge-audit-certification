@@ -42,3 +42,19 @@ def l_post_v2(v_pilot, sb2, slack, z, N, n_pilot, b_ref=4, b_min=4, l_max=2_000_
         else:
             lo = mid
     return hi
+
+
+def l_post_v3(row, z, N, n_pilot, b_ref=4, b_min=4, ref="ref"):
+    """v3: the certificate must pass every comparison, so L_post = max over comparisons j of the v2 label count computed
+    from that comparison's own (v_j, sb2_j, slack_j). `row` is a per-draw record with columns v_pilot_{ref}_c{k}, sb2_c{k},
+    slack_c{k} (k = 0, 1, ...); comparisons whose columns are missing are skipped."""
+    best = 0.0; k = 0
+    while f"slack_c{k}" in row and f"sb2_c{k}" in row:
+        vcol = f"v_pilot_{ref}_c{k}" if ref else f"v_pilot_c{k}"
+        if vcol not in row:
+            break
+        v, sb, sl = row[vcol], row[f"sb2_c{k}"], row[f"slack_c{k}"]
+        if np.isfinite(v) and np.isfinite(sl):
+            best = max(best, l_post_v2(v, sb, sl, z, N, n_pilot, b_ref, b_min))
+        k += 1
+    return best if k else float("nan")

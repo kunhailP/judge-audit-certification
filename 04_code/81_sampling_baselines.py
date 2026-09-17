@@ -87,7 +87,7 @@ def pilot_predicted_variance(arr, tr, H, prob, cand, others, sd, lam_pair, b_ref
     averaged over pilot queries and comparisons. The variance-dilution model (95_cost_model.py) says the post-pilot cost
     ratio of two arms is the ratio of these quantities, so their ratio to `weighted` is a pre-audit prediction of the
     arm's saving that uses nothing outside the pilot."""
-    vp = {m: [] for m in ARMS}
+    vp = {m: [] for m in ARMS}; vpj = {m: {j: [] for j in others} for m in ARMS}
     for k in tr:
         r, rj, ks = arr[k]; n = len(r)
         W, bases = make_bases(ks, cand, others, n, prob[H[k]["qid"]], sd)
@@ -95,8 +95,12 @@ def pilot_predicted_variance(arr, tr, H, prob, cand, others, sd, lam_pair, b_ref
             pi = sample_pi(shared_base(bases, SAMPLER_OF.get(m, m), others), b_ref, n); ok = pi > 0
             for j in others:
                 y = r - lam_pair[j] * rj if m == "weighted_cvl" else (r - rj if m.endswith("_cv") else r)
-                vp[m].append(float(((W[j][ok] * y[ok]) ** 2 * (1.0 - pi[ok]) / pi[ok]).sum()))
-    return {m: float(np.mean(vp[m])) for m in ARMS}
+                v = float(((W[j][ok] * y[ok]) ** 2 * (1.0 - pi[ok]) / pi[ok]).sum()); vp[m].append(v); vpj[m][j].append(v)
+    out = {m: float(np.mean(vp[m])) for m in ARMS}
+    for m in ARMS:                                   # per-comparison means, keyed by the competitor's menu index
+        for j in others:
+            out[(m, j)] = float(np.mean(vpj[m][j]))
+    return out
 
 
 def estimate(m, w, r, rj, pi, samp, lam):
@@ -207,11 +211,17 @@ def main():
                         slack_pilot = float(min(eps - D_known[j].mean() for j in others))    # pilot estimate of the binding slack
                         j_bind = min(others, key=lambda j: eps - D_known[j].mean())
                         sb2_pilot = float(D_known[j_bind].var(ddof=1)) if len(tr) > 1 else float("nan")   # between-query variance of D (binding comparison) on the pilot
+                        # per-comparison pilot quantities (v3 predictor: the binding comparison is the one with the largest v/s^2)
+                        percomp = {}
+                        for ci, j in enumerate(sorted(others)):
+                            percomp[f"slack_c{ci}"] = float(eps - D_known[j].mean()); percomp[f"sb2_c{ci}"] = float(D_known[j].var(ddof=1)) if len(tr) > 1 else float("nan")
                     if a.predict_only:
                         for m in ARMS:
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw, pilot=int(pilot_docs),
                                                   v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, sb2_pilot=sb2_pilot,
-                                                  n_queries=N, n_train=int(a.n_train), cand=int(cand)))
+                                                  n_queries=N, n_train=int(a.n_train), cand=int(cand), **percomp,
+                                                  **{f"v_pilot_c{ci}": v_pilot[(m, j)] for ci, j in enumerate(sorted(others))},
+                                                  **{f"v_pilot_ref_c{ci}": v_pilot[("weighted", j)] for ci, j in enumerate(sorted(others))}))
                         # replay the random-number consumption of the audit so that later draws use the same permutations as the full run
                         for k in q_w:
                             n_k = len(arr[k][0])
@@ -257,7 +267,9 @@ def main():
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw,
                                                   docs=int(L[m].cost), pilot=int(pilot_docs), act=int(ok), wrong=int(ok and regret > eps), regret=regret,
                                                   v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, sb2_pilot=sb2_pilot, slack_true=eps - regret,
-                                                  n_queries=N, n_train=int(a.n_train), b=int(b), n_sampled=int(len(q_w))))
+                                                  n_queries=N, n_train=int(a.n_train), b=int(b), n_sampled=int(len(q_w)), **percomp,
+                                                  **{f"v_pilot_c{ci}": v_pilot[(m, j)] for ci, j in enumerate(sorted(others))},
+                                                  **{f"v_pilot_ref_c{ci}": v_pilot[("weighted", j)] for ci, j in enumerate(sorted(others))}))
                         for kk in cnt_alt[m]:
                             cnt_alt[m][kk] += ok_alt[kk]
                 _tick(f"cell B={Bq} eps={eps} done ({a.draws} draws)")
