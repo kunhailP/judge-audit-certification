@@ -1,0 +1,8 @@
+[09:14:49] === neuclir_eng: queries=105 judged docs with text=143213 of 143213
+[09:16:45]   embedded minilm
+[09:29:35]   embedded mpnet
+[09:59:39]   embedded qwen3e
+[10:00:20]   reranker scoring 7424 pairs
+[10:00:23]     rr 0/7424
+[10:01:40]   saved neuclir_eng: 7424 rows, pool/query=70.7, relevant/query=18.9
+exit 0

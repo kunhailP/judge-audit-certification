@@ -20,3 +20,8 @@
   (predict-only never writes the summary). Order of events for the held-out test: reranker audit scored -> v2-v4 written -> Qwen3-8B
   judgments generated -> v1-v4 locked -> Qwen3-8B audit -> v3 designated primary. 97_pilot_rule.py now also scores the executable
   single-pilot rule (PILOT_RULE_single_eps*.csv).
+- LOCK v0.7 (NeuCLIRBench, English mono, 105 topics; commits 1750865 lock text -> b833065 rr/inv predictions -> ad91bfd Qwen3-8B
+  predictions -> audit). Nothing in the rule was changed. Scores: PILOT_RULE_neuclir_*_eps*.csv, PILOT_RULE_single_neuclir_*.csv,
+  neuclir_scores/. Pre-registered criteria: (a) rule within 2 points of the better always-policy: met in 11 of 12 cells (miss:
+  Qwen3-8B, pilot 20, eps=0.01: rule 2.3% vs always-CV 5.3%); (b) inverted judge adopted by <=10% of pilots: met in 1 of 4 cells
+  (6.9%, 11.6%, 11.9%, 14.7%; the adoptions cost nothing because lambda -> 0). Reported as is.
