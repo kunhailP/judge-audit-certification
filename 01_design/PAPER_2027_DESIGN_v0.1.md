@@ -1273,3 +1273,9 @@ reranker(v1만 사전 고정; v2–v4는 사후): v2–v4 8/8, v1 4/8.
 
 ### 16.11 원고 압축 (2026-09-17)
 25쪽 → 20쪽(본문 11쪽 + 참고문헌 + 부록 8쪽). 초록 450 → 370단어. 기여 4항목을 2–4문장으로, §3 MSE 재측정 세부·§4 exactness·§5.3 estimand 귀속 수치·§7 CAsT/ANTIQUE 서술·§8 (2) 메뉴 배분을 절반 이하로 줄이고 세부는 부록(F에 estimand 귀속, D·E 압축)으로. 비용 모델·pilot 규칙·held-out을 §5.3의 두 문단으로 통합. 수치는 모두 이전 본문 값을 그대로 옮김(신규 수치 없음). 남은 편집: 부록 F/H의 문장 다듬기, 표 캡션 통일.
+
+### 16.12 제목·그림·문체 (2026-09-17)
+- 제목: "Certifying Retrieval Policies with Non-Neutral AI Judges: What a Judge Saves, and How a Pilot Predicts It".
+- 그림: `99_figures.py` + `lib/figstyle.py`로 F4–F9를 저장된 CSV/parquet에서 한 스타일(STIX 서체, 그림 내 제목 없음, Okabe–Ito 팔레트, 읽을 수 있는 collection·판정자 이름, 범례 바깥)로 재생성. F5는 `planner_v2/judged_*_ext/planner_v2.parquet`에서 누적 ACT를 다시 계산.
+- 문체: "Three things follow", "It is tempting to read", 자화자찬성 표현, 문장 중간의 em-dash 삽입구를 제거·분리. 수치 불변.
+- 커밋 메시지의 co-author trailer는 저장소 규약(§12.9)에 따라 제거, 로컬 commit-msg hook 설치.
