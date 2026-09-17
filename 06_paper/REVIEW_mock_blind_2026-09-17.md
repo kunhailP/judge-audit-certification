@@ -129,3 +129,8 @@ regimes and one collection.
     but now lives in Appendix E; say "(Figure 5, Appendix E)" at the reference.
 25. Consistency of "λ-fitted" / "λ-corrected" / "coefficient-λ" for the same estimator; choose one ("λ-fitted") outside §7 where the
     lock's wording is quoted.
+
+
+---
+
+**Status (2026-09-17, later the same day):** all ★ items and items 4, 6, 7, 8, 9, 10, 13, 17, 19, 20, 21, 23 applied in commit after 9b3bf5a; items 12, 22, 25 left as cosmetic (bold run-in headings are TMLR-conformant; "n.r." only in appendix table captions where it is defined; the λ-corrected wording is kept only where the ANTIQUE lock is quoted).
