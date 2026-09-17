@@ -33,7 +33,7 @@ def main():
         g0 = g[g.budget_full_eq == g.budget_full_eq.min()]          # pilot quantities do not depend on the budget
         ref = g0[g0.method == REF].set_index("draw"); P = float(g0.pilot.mean()); N = int(g0.n_queries.iloc[0])
         z = float(tdist.ppf(1 - 0.10 / 6, N - 21))
-        L = z ** 2 * a.b_ref * ref.v_pilot / ref.slack_pilot.clip(lower=1e-4); share = L / (L + P)
+        L = z ** 2 * a.b_ref * ref.v_pilot / ref.slack_pilot.clip(lower=1e-4) ** 2; share = L / (L + P)   # bug fixed 2026-09-17 (slack was not squared in the first lock, commit 7deb082)
         for m, gm in g0.groupby("method"):
             if m == REF:
                 continue
