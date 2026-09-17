@@ -4,6 +4,9 @@
 All arms choose the candidate on the same fully-labelled pilot queries, and certify with the same bound over ordered
 pairs. Per-query estimator of D_j = Σ_d w_j(d) r(d) for every competitor j of the candidate:
   uniform      : π_d = b/|pool|                       (HT)
+  uniform_nz   : π_d = b/|{d: Σ_j |w_j(d)| > 0}|       (HT)   — uniform over the decision-relevant documents only
+                 (2026-09-17: separates "skip the documents that cannot move any comparison" from "sample the
+                 relevant ones in proportion to |w|"; with shared sampling the support is the union over comparisons)
   weighted     : π_d ∝ |w_d|                          (HT)   — importance sampling by decision weight
   active_judge : π_d ∝ |w_d| · sqrt(p̂_d(1−p̂_d))       (HT)   — Active-Inference-style: influence × judge uncertainty
   strat_pilot  : π_d ∝ |w_d| · σ̂_stratum, σ̂ from the pilot (labels counted), strata = {band, common}
@@ -40,7 +43,7 @@ spec = importlib.util.spec_from_file_location("ledger", os.path.join(HERE, "lib"
 ledger = importlib.util.module_from_spec(spec); spec.loader.exec_module(ledger)
 bc, cert, MENU = pv.bc, pv.cert, pv.MENU
 ALPHA = 0.10
-ARMS = ["uniform", "weighted", "active_judge", "strat_pilot", "weighted_cv", "active_cv", "weighted_cvl"]
+ARMS = ["uniform", "uniform_nz", "weighted", "active_judge", "strat_pilot", "weighted_cv", "active_cv", "weighted_cvl"]
 SAMPLER_OF = {"weighted_cv": "weighted", "active_cv": "active_judge", "weighted_cvl": "weighted"}
 
 
@@ -84,6 +87,7 @@ def main():
     ap.add_argument("--bound", choices=["t", "eb", "bet"], default="t")
     ap.add_argument("--legacy", action="store_true", help="old design: per-pair draws with b docs each, cutoff pilot cost, t bound, no _v2 suffix")
     ap.add_argument("--tag", default="", help="suffix for the output file (e.g. _cvl)")
+    ap.add_argument("--dump_draws", action="store_true", help="also write one row per (draw, arm) with its unique-label cost and certificate outcome (for bootstrap CIs of J50 and of savings ratios, 94_j50_ci.py)")
     a = ap.parse_args()
     if a.legacy:
         a.sampling, a.pilot_cost, a.bound = "per_pair", "cutoff", "t"
@@ -92,7 +96,7 @@ def main():
     if a.train_dir:
         pv.JUDGE = "rr"; data.update(pv.load_train_only(a.train_dir, a.train_names)); pv.JUDGE = a.judge
     rng_global = np.random.default_rng(0); rng = np.random.default_rng(31)
-    M = len(MENU); a_sim = ALPHA / (M * (M - 1)); rows = []
+    M = len(MENU); a_sim = ALPHA / (M * (M - 1)); rows = []; draw_rows = []
     for held in [d for d in data if d not in pv.TRAIN_ONLY]:
         P, structs, reg = pv.fit_lodo(data, held, rng_global)
         H = structs[held]; c_star = pv.finalize(H, reg); N = len(H)
@@ -107,7 +111,7 @@ def main():
                 # attribution diagnostic (same draws): certificate under (a) the superseded i.i.d. t bound on the non-pilot
                 # estimates, (b) pilot known exactly + i.i.d. t on the rest (no FPC / two-stage), (c) the full population bound
                 cnt_alt = {m: {"iid": 0, "pilot_iid": 0} for m in ARMS}
-                for _ in range(a.draws):
+                for i_draw in range(a.draws):
                     perm = rng.permutation(N); tr = perm[:a.n_train]
                     c_tr, tau_tr, _ = pv.fit_params([H[k] for k in tr]); arr = wa.arrays(H, HJ, c_tr, tau_tr)
                     cost_full = np.array([max(ks) for _, _, ks in arr], float)
@@ -160,11 +164,14 @@ def main():
                         for j in others:
                             aw = np.abs(W[j]); lo, hi = min(ks[j], ks[cand]), max(ks[j], ks[cand])
                             strat = np.array([sd[j]["band"] if lo <= i < hi else sd[j]["common"] for i in range(n)])
-                            bases[j] = {"uniform": np.ones(n), "weighted": aw, "active_judge": aw * np.sqrt(np.clip(pj * (1 - pj), 1e-4, None)), "strat_pilot": aw * strat}
+                            bases[j] = {"uniform": np.ones(n), "uniform_nz": (aw > 0).astype(float), "weighted": aw, "active_judge": aw * np.sqrt(np.clip(pj * (1 - pj), 1e-4, None)), "strat_pilot": aw * strat}
                         for m in ARMS:
                             key = SAMPLER_OF.get(m, m)
                             if a.sampling == "shared":
-                                pi = sample_pi(sum(bases[j][key] for j in others), b, n); samp = (rng.random(n) < pi) & (pi > 0)
+                                base = sum(bases[j][key] for j in others)
+                                if key == "uniform_nz":
+                                    base = (base > 0).astype(float)     # union of the comparisons' supports, equal probability inside it
+                                pi = sample_pi(base, b, n); samp = (rng.random(n) < pi) & (pi > 0)
                                 L[m].request(qid, np.flatnonzero(samp), pool_size=n)
                                 for j in others:
                                     v, lo, hi, vv = estimate(m, W[j], r, rj, pi, samp, lam_pair[j]); est[m][j].append(v); rng_lo[m][j].append(lo); rng_hi[m][j].append(hi); vh[m][j].append(vv)
@@ -192,6 +199,9 @@ def main():
                         docs[m].append(L[m].cost); dup[m].append(L[m].duplicate_fraction())
                         if ok:
                             cnt[m][0] += 1; cnt[m][1] += regret > eps
+                        if a.dump_draws:
+                            draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw,
+                                                  docs=int(L[m].cost), pilot=int(pilot_docs), act=int(ok), wrong=int(ok and regret > eps), regret=regret))
                         for kk in cnt_alt[m]:
                             cnt_alt[m][kk] += ok_alt[kk]
                 for m in ARMS:
@@ -207,7 +217,10 @@ def main():
     import pandas as pd
     out = os.path.join(HUB, "05_results", "sampling_baselines"); os.makedirs(out, exist_ok=True)
     suffix = "" if a.legacy else f"_v2_{a.sampling}_{a.pilot_cost}_{a.bound}"
-    pd.DataFrame(rows).to_csv(os.path.join(out, f"baselines_{a.stack}_{a.judge}{'_forceworst' if a.force_worst else ''}{'_boundary' if a.boundary else ''}{a.tag}{suffix}.csv"), index=False)
+    stem = f"baselines_{a.stack}_{a.judge}{'_forceworst' if a.force_worst else ''}{'_boundary' if a.boundary else ''}{a.tag}{suffix}"
+    pd.DataFrame(rows).to_csv(os.path.join(out, stem + ".csv"), index=False)
+    if a.dump_draws:
+        pd.DataFrame(draw_rows).to_csv(os.path.join(out, stem + "_draws.csv"), index=False)
 
 
 if __name__ == "__main__":

@@ -82,7 +82,7 @@ def add_block(pattern, block, arms, judge_of):
                 rows.append(dict(block=block_f, collection=c, judge=judge_of(j, m), method=m, eps=e, J50_docs=j50, J50_queries=np.nan,
                                  wrong_rate=float(s.wrong.max()), n=300, max_budget_docs=float(docs.max()), max_act=float(s.act.max())))
 jname = {"llm": "Qwen3-8B", "rr": "Qwen3-Reranker", "mistral": "Mistral-7B", "inv": "inverted"}
-add_block(os.path.join(R, "sampling_baselines", "baselines_*.csv"), "B doc-level, precision", ["uniform", "weighted", "strat_pilot", "weighted_cv"],
+add_block(os.path.join(R, "sampling_baselines", "baselines_*.csv"), "B doc-level, precision", ["uniform", "uniform_nz", "weighted", "strat_pilot", "weighted_cv"],
           lambda j, m: jname.get(j, j) if m.endswith("_cv") else "—")
 add_block(os.path.join(R, "active_inference", "active_*.csv"), "B doc-level, precision", ["ai_calib", "ai_resid", "ai_robust_0.5"], lambda j, m: jname.get(j, j))
 add_block(os.path.join(R, "menu_allocation", "menu_alloc_*.csv"), "C 4-policy menu, precision", ["static_sum", "per_pair", "adaptive", "oracle", "static_sum_v", "oracle_exact", "plugin_exact"], lambda j, m: jname.get(j, j))
