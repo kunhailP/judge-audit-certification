@@ -1116,3 +1116,52 @@ pilot 회귀 λ(∈[0,1])를 CV 계수로 쓰면 적대적 판정자의 손실(+
 ### 15.4 다음 단계 (Featured를 가르는 부분)
 - 3단계: pilot·후보 선택·slack 분석을 "감사 전 판단 규칙"(입력: pilot의 ρ 추정, N_unlab, pilot 비용, 추정 margin, bound 종류 → 출력: judge CV / 인간 단독 가중 표집 / 복잡한 배분 중 선택)으로
   묶고, 고정한 예측을 별도 collection에서 검증. 기존 PPI·active inference 문헌이 이미 제공하는 판단과 대조하는 것이 선행.
+
+## 16. Track C — 인증 비용을 사전에 설명·예측하는 규칙 (2026-09-17, 저장된 결과만으로 수행)
+
+질문: "판정자(또는 어떤 표집 설계)가 추정 분산을 줄이면 그것이 실제 인증 비용 절감으로 얼마나 번역되는가? 감사 전에 알 수 있는가?"
+
+### 16.1 분산 희석(variance-dilution) 비용 모델 — `95_cost_model.py`, `05_results/unified/COST_MODEL_*.csv`, F8
+모델. 모집단 estimand에서 비-pilot query를 전부 감사하면(J50 도달 예산에서는 f=1) bound의 분산은 mean_q(v_q)/n이고, π ∝ base인 Poisson 표집에서
+v_q ∝ 1/b(query당 문서 수). 따라서 분산 ∝ v_arm / L_post (L_post = pilot 이후 라벨 수)이고 인증은 z·sqrt(v_arm/L_post) ≤ slack에서 일어난다.
+같은 pilot·후보·slack을 공유하는 두 arm에 대해
+    (J50_a − P)/(J50_b − P) ≈ v_a/v_b,   총 절감 = 1 − J50_a/J50_b = (1 − v_a/v_b) · (1 − P/J50_b)  [분산 감소 × pilot 이후 비중].
+v는 저장된 `var_est`(query당 추정치 분산)의 최소 예산 3개 평균(b=4, within-query 표집 분산이 지배)에서 읽는다.
+
+검증(Table 2·4의 175개 (collection, judge, ε, arm) 셀, 기준 arm = weighted):
+- corr(log 비용비, log 분산비) = **0.947**, 중앙값 배율 오차 1.10×, 90분위 1.35×.
+- 판정자 arm의 총 절감: corr(예측, 실측) = 0.83, MAE 0.06 (총 J50 단위). λ-CV arm 18셀 중 9셀이 ±0.02, DBpedia ε=0.01(예측 0.19–0.21, 실측 0.07–0.10) 외에는 ±0.05 이내.
+- arm별 중앙값 |log 오차|: weighted_cv 0.06, weighted_cvl 0.08, ai_resid 0.06, robust 0.08–0.10, strat 0.05, uniform 0.09, ai_calib 0.11, **active_judge/active_cv 0.22–0.26**
+  (|w|·sqrt(ĵ(1−ĵ)) 표집은 π가 1에서 포화해 분산이 1/b보다 빨리 떨어지므로 소예산 분산비가 비용비를 과대예측).
+- collection별: ANTIQUE 0.08, DBpedia 0.09, DL 0.08, CAsT 0.17.
+- pilot 이후 비중(1 − P/J50_w) 0.22–0.71 → 같은 분산 감소(≈30%)가 DL에서는 3%, CAsT·DBpedia에서는 19–20%의 총 절감으로 나타나는 이유가 정확히 이 곱셈.
+
+판독: **Table 2의 판정자 증분은 "판정자가 만든 분산 감소 × pilot 이후 라벨 비중"으로 완전히 설명된다.** 두 인자는 모두 pilot만으로 계산 가능하다
+(pilot query의 라벨은 모두 알므로 각 설계의 within-query HT 분산을 그대로 계산; pilot 이후 비중은 pilot slack으로부터 L_post = z²·b_ref·v_w/ŝ²).
+
+메뉴 배분(83, 29셀)에는 같은 모델이 **실패**한다: 실현 design objective(max_j V_j/s_j²) 비 vs pilot 이후 비용비 corr = 0.53.
+oracle의 objective는 static 대비 1.5–2.2× (CAsT ε=0.01은 13×) 좋지만 비용은 0.79–1.00; plug-in의 objective는 7셀 중 6셀에서 2–14× *나쁘지만* 비용은 0.83–1.24.
+원인: draw 평균 objective는 slack이 가장 작은(어떤 설계로도 인증 안 되는) draw가 지배하고, J50은 중앙 draw가 결정한다. 원고 §7(2)·부록 D의
+"threshold event" 설명을 정량화한 것. → **"좋은 추정 ≠ 좋은 인증"의 정확한 위치는 분산-비용 번역이 아니라 (a) pilot 희석과 (b) 목적함수가
+인증 불가능한 draw에 지배되는 것**이다.
+
+원고 반영: §5.3 "A cost model that reproduces the table" 문단, §7(2) 한 문장, 부록 F(`app:costmodel`) + F8. (22쪽)
+
+### 16.2 문헌 대조 (이 결과가 기존에 없는가)
+- Mani et al. 2025 (No Free Lunch): PPI++가 인간 단독보다 나아지는 유한표본 조건 |ρ| ≳ 1/√(n/2−2) (cross-fit). n=45 검증 반쪽이면 ≈0.22.
+  우리 map은 ρ=0.39에서도 인증 이득이 없다 → **추정 효율의 문턱이 아니라 인증 사건의 문턱**이 지배적. 이 차이를 16.3의 계산기가 정량화해야 한다.
+- Zrnic & Candès 2024, Li et al. 2025, Sfyraki & Wang 2026: 분산 최적 표집·안전 혼합·단순 표집의 경쟁력. 분산까지의 결과. "분산 → 인증 비용" 번역과
+  pilot 희석, 사전 예측 규칙은 다루지 않음.
+- Ochoa Rivera & Tewari 2024 (thresholding linear bandit), Fiez et al. 2019: 메뉴 인증의 배분은 이 틀로 환원 가능하나, 그 문헌의 목적함수도
+  slack-가중 분산이므로 16.1의 "objective가 인증 불가능 draw에 지배" 현상은 그쪽에서도 실무적 함의를 가진다(주장은 우리 데이터 범위로 한정).
+→ 기여 문장 후보: "판정자·표집 설계의 가치는 (분산 감소) × (pilot 이후 비중)으로 pilot에서 사전 계산되며, 이 규칙이 [검증 결과]를 맞힌다."
+
+### 16.3 질의 단위 mechanism map 계산기 — `96_ppi_calculator.py` (결과는 실행 완료 후 추가)
+(ρ, σ, gap, n, N_unlab, ε)만으로 F6를 재현하는지, λ 추정 잡음·clip·finite-N λ가 각각 얼마나 기여하는지.
+
+### 16.4 사전 판단 규칙의 검증 절차 — `97_pilot_rule.py` (pools 필요)
+`81 --dump_draws`가 draw별로 기록하는 v_pilot(각 arm의 pilot 기반 within-query 분산, b_ref=4), slack_pilot, slack_true를 사용.
+- 예측 1(arm 순위): v_pilot 비 → pilot 이후 비용비. 예측 2(총 절감): (1 − v비) × 예측 비중, 비중은 L_post_pred = z²·b_ref·v_w/ŝ².
+- 판단: "판정자 CV 사용 권고 iff 예측 절감 > τ(=0.05)" 를 draw별로 내리고 셀 실측 J50과 대조(정확도, 오권고, 누락).
+- 검증 설계: 개발 4 collection에서 규칙을 고정 → 새 collection 1개(후보: TREC DL 2019/2020 fully judged pool, 또는 Touché/COVID를 문서 단위로)에
+  **실행 전 예측을 기록**(pilot 20 query만 사용) → 실측과 대조. 이것이 Featured 주장의 핵심 실험.

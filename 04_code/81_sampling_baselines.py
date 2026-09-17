@@ -58,6 +58,42 @@ def sample_pi(base, b, n):
     return pi
 
 
+def make_bases(ks, cand, others, n, pj, sd):
+    """Decision weights W[j] and the sampling bases of every design for one query (shared by the audit and by the
+    pilot-only prediction below)."""
+    W = {j: wa.weights(ks, j, cand, n) for j in others}
+    bases = {}
+    for j in others:
+        aw = np.abs(W[j]); lo, hi = min(ks[j], ks[cand]), max(ks[j], ks[cand])
+        strat = np.array([sd[j]["band"] if lo <= i < hi else sd[j]["common"] for i in range(n)])
+        bases[j] = {"uniform": np.ones(n), "uniform_nz": (aw > 0).astype(float), "weighted": aw,
+                    "active_judge": aw * np.sqrt(np.clip(pj * (1 - pj), 1e-4, None)), "strat_pilot": aw * strat}
+    return W, bases
+
+
+def shared_base(bases, key, others):
+    base = sum(bases[j][key] for j in others)
+    return (base > 0).astype(float) if key == "uniform_nz" else base
+
+
+def pilot_predicted_variance(arr, tr, H, prob, cand, others, sd, lam_pair, b_ref):
+    """Pilot-only prediction (2026-09-17, Track C): the within-query document-sampling variance of every arm's estimator
+    at b_ref documents per query, evaluated on the fully labelled pilot queries (whose human and judge labels are known),
+    averaged over pilot queries and comparisons. The variance-dilution model (95_cost_model.py) says the post-pilot cost
+    ratio of two arms is the ratio of these quantities, so their ratio to `weighted` is a pre-audit prediction of the
+    arm's saving that uses nothing outside the pilot."""
+    vp = {m: [] for m in ARMS}
+    for k in tr:
+        r, rj, ks = arr[k]; n = len(r)
+        W, bases = make_bases(ks, cand, others, n, prob[H[k]["qid"]], sd)
+        for m in ARMS:
+            pi = sample_pi(shared_base(bases, SAMPLER_OF.get(m, m), others), b_ref, n); ok = pi > 0
+            for j in others:
+                y = r - lam_pair[j] * rj if m == "weighted_cvl" else (r - rj if m.endswith("_cv") else r)
+                vp[m].append(float(((W[j][ok] * y[ok]) ** 2 * (1.0 - pi[ok]) / pi[ok]).sum()))
+    return {m: float(np.mean(vp[m])) for m in ARMS}
+
+
 def estimate(m, w, r, rj, pi, samp, lam):
     """Per-query estimate of D = Σ w r for arm m, its deterministic range [lo, hi] given (w, rj, pi), and the HT
     estimate of its document-sampling variance (used by the two-stage population bound)."""
@@ -87,7 +123,7 @@ def main():
     ap.add_argument("--bound", choices=["t", "eb", "bet"], default="t")
     ap.add_argument("--legacy", action="store_true", help="old design: per-pair draws with b docs each, cutoff pilot cost, t bound, no _v2 suffix")
     ap.add_argument("--tag", default="", help="suffix for the output file (e.g. _cvl)")
-    ap.add_argument("--dump_draws", action="store_true", help="also write one row per (draw, arm) with its unique-label cost and certificate outcome (for bootstrap CIs of J50 and of savings ratios, 94_j50_ci.py)")
+    ap.add_argument("--dump_draws", action="store_true", help="also write one row per (draw, arm) with its unique-label cost, certificate outcome and the pilot-only variance prediction (94_j50_ci.py, 97_pilot_rule.py)")
     a = ap.parse_args()
     if a.legacy:
         a.sampling, a.pilot_cost, a.bound = "per_pair", "cutoff", "t"
@@ -157,21 +193,16 @@ def main():
                     # exact paired differences of the fully labelled pilot queries (known part of the population mean)
                     D_known = {j: np.array([(wa.weights(arr[k][2], j, cand, len(arr[k][0])) * arr[k][0]).sum() for k in tr]) for j in others}
                     b_pair = b if a.legacy else max(1, b / len(others))
+                    if a.dump_draws:
+                        v_pilot = pilot_predicted_variance(arr, tr, H, prob, cand, others, sd, lam_pair, a.docs_per_query)
+                        slack_pilot = float(min(eps - D_known[j].mean() for j in others))    # pilot estimate of the binding slack
                     for k in q_w:
                         r, rj, ks = arr[k]; n = len(r); pj = prob[H[k]["qid"]]; qid = H[k]["qid"]
-                        W = {j: wa.weights(ks, j, cand, n) for j in others}
-                        bases = {}
-                        for j in others:
-                            aw = np.abs(W[j]); lo, hi = min(ks[j], ks[cand]), max(ks[j], ks[cand])
-                            strat = np.array([sd[j]["band"] if lo <= i < hi else sd[j]["common"] for i in range(n)])
-                            bases[j] = {"uniform": np.ones(n), "uniform_nz": (aw > 0).astype(float), "weighted": aw, "active_judge": aw * np.sqrt(np.clip(pj * (1 - pj), 1e-4, None)), "strat_pilot": aw * strat}
+                        W, bases = make_bases(ks, cand, others, n, pj, sd)
                         for m in ARMS:
                             key = SAMPLER_OF.get(m, m)
                             if a.sampling == "shared":
-                                base = sum(bases[j][key] for j in others)
-                                if key == "uniform_nz":
-                                    base = (base > 0).astype(float)     # union of the comparisons' supports, equal probability inside it
-                                pi = sample_pi(base, b, n); samp = (rng.random(n) < pi) & (pi > 0)
+                                pi = sample_pi(shared_base(bases, key, others), b, n); samp = (rng.random(n) < pi) & (pi > 0)
                                 L[m].request(qid, np.flatnonzero(samp), pool_size=n)
                                 for j in others:
                                     v, lo, hi, vv = estimate(m, W[j], r, rj, pi, samp, lam_pair[j]); est[m][j].append(v); rng_lo[m][j].append(lo); rng_hi[m][j].append(hi); vh[m][j].append(vv)
@@ -201,7 +232,9 @@ def main():
                             cnt[m][0] += 1; cnt[m][1] += regret > eps
                         if a.dump_draws:
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw,
-                                                  docs=int(L[m].cost), pilot=int(pilot_docs), act=int(ok), wrong=int(ok and regret > eps), regret=regret))
+                                                  docs=int(L[m].cost), pilot=int(pilot_docs), act=int(ok), wrong=int(ok and regret > eps), regret=regret,
+                                                  v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, slack_true=eps - regret,
+                                                  n_queries=N, b=int(b), n_sampled=int(len(q_w))))
                         for kk in cnt_alt[m]:
                             cnt_alt[m][kk] += ok_alt[kk]
                 for m in ARMS:
