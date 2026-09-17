@@ -7,6 +7,15 @@
 # The other arms' draws are unchanged (uniform_nz uses its own random stream), so the existing v3 numbers reproduce exactly.
 # Requires the pools bundle (see RUN_REVISED_ACCOUNTING.sh). One process per (collection, judge, budget), tag _v3b{B}.
 set -euo pipefail
+# One BLAS thread per process: with the default (one thread per core) 84 processes x 158 threads thrash a cgroup CPU quota
+# (measured 2026-09-17: a 2-draw probe took 48 s single-threaded vs >28 min for a 3-draw probe inside the thrashing grid).
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+quota_cores() {  # cgroup v2 cpu.max or v1 cfs quota; falls back to nproc
+  if [ -r /sys/fs/cgroup/cpu.max ]; then read -r q p < /sys/fs/cgroup/cpu.max; [ "$q" != max ] && { echo $((q / p)); return; }; fi
+  if [ -r /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]; then q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us); p=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us); [ "$q" -gt 0 ] && { echo $((q / p)); return; }; fi
+  nproc
+}
+JOBS=${JOBS:-$(quota_cores)}
 POOLS=${POOLS:-/workspace/pools_bundle}
 TRAIN_DIR=${TRAIN_DIR:-$POOLS/legacy/runs/candidates}
 DRAWS=${DRAWS:-300}
@@ -20,7 +29,11 @@ CFG=(
   "judged  dbpedia-entity llm,rr       5 10 15 20 30 45 60 90 120 150 200"
   "dlv2    dl212223       llm          5 10 15 20 30 45 60 90"
 )
-run() { local name; name="81_${stack}_${judge}_b${B}"; echo "[start] $*"; nohup python3 "$@" > "$LOG/$name.log" 2>&1 & }
+run() {  # at most $JOBS concurrent processes (the cgroup CPU quota by default)
+  while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do sleep 5; done
+  local name; name="81_${stack}_${judge}_b${B}"; echo "[start $(date +%H:%M:%S)] $*"; AUDIT_TIMING=1 nohup python3 "$@" > "$LOG/$name.log" 2>&1 &
+}
+echo "[config] JOBS=$JOBS DRAWS=$DRAWS"
 
 for line in "${CFG[@]}"; do
   read -r stack names judges budgets <<<"$line"

@@ -31,8 +31,13 @@ the per-query HT / CV estimate is computed from (w, π) and is sample-independen
 Metrics: ACT rate, wrong rate, mean unique human labels (docs_labelled, docs_pilot), duplicate fraction, per-query
 estimator variance.
 """
-import argparse, importlib.util, math, os
+import argparse, importlib.util, math, os, sys, time
 import numpy as np
+TIMING = os.environ.get("AUDIT_TIMING") == "1"
+_t0 = time.time()
+def _tick(msg):
+    if TIMING:
+        print(f"[timing {time.time() - _t0:8.1f}s] {msg}", file=sys.stderr, flush=True)
 
 HERE = os.path.dirname(os.path.abspath(__file__)); HUB = os.path.dirname(HERE)
 spec = importlib.util.spec_from_file_location("pv", os.path.join(HERE, "63_planner_v2.py"))
@@ -131,11 +136,13 @@ def main():
     data = pv.load_with_judge(os.path.join(a.pools, a.stack, "runs", "candidates"))
     if a.train_dir:
         pv.JUDGE = "rr"; data.update(pv.load_train_only(a.train_dir, a.train_names)); pv.JUDGE = a.judge
+    _tick("data loaded")
     rng_global = np.random.default_rng(0); rng = np.random.default_rng(31)
     rng_nz = np.random.default_rng(1031)   # own stream for the 2026-09-17 arm, so that every other arm's draws are unchanged
     M = len(MENU); a_sim = ALPHA / (M * (M - 1)); rows = []; draw_rows = []
     for held in [d for d in data if d not in pv.TRAIN_ONLY]:
         P, structs, reg = pv.fit_lodo(data, held, rng_global)
+        _tick(f"fit_lodo done for {held}")
         H = structs[held]; c_star = pv.finalize(H, reg); N = len(H)
         HJ = bc.build_structs({held: data[held]["judge"]}, held, P[held]); pv.finalize(HJ, reg)
         pj_all = data[held]["rr"]                                # probability of the *current* judge (loader order)
@@ -239,6 +246,7 @@ def main():
                                                   n_queries=N, b=int(b), n_sampled=int(len(q_w))))
                         for kk in cnt_alt[m]:
                             cnt_alt[m][kk] += ok_alt[kk]
+                _tick(f"cell B={Bq} eps={eps} done ({a.draws} draws)")
                 for m in ARMS:
                     rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, act=cnt[m][0] / a.draws,
                                      wrong=cnt[m][1] / a.draws, var_est=float(np.mean(varr[m])) if varr[m] else float("nan"),
