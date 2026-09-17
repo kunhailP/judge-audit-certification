@@ -1308,3 +1308,4 @@ L_post(pilot 20): 실측 401/592 vs v3 324/440(과소 20–25%), v2 351/484, v1 
 - NeuCLIR 결과 문단(~400단어): Qwen 예측 vs 실현 / 규칙과 기준 두 문단으로 분리, 네 셀 절감률 숫자는 표 참조, 마지막 "The independent test thus supports…" 요약 문장 삭제(near-threshold 한 문장만 유지).
 - Negative results: "Four things did not work as hoped" → "Four results bound the contribution"; (4)의 철회 경위는 Appendix I(재현성 노트)로 이동, 본문은 현재 결과만.
 - 사전 고정 시점, 실패한 기준(9/12, 1/4), 예측기 수정 순서는 모두 그대로. 컴파일 22쪽, 경고 없음. 초록 303단어.
+- (추가, 같은 날) 리뷰 후속: 초록 마지막 문장 삭제(273단어), Negative results 도입문 "Four results bound the contribution." 삭제. 전 레포의 `TMLR_submission_anonymous.zip`이 문체 수정 전 원고를 담고 있던 것을 최신 tex/pdf/figures로 다시 묶음(식별 문자열 검사 통과). 22쪽, 경고 없음.
