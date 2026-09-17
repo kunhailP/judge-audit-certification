@@ -205,10 +205,13 @@ def main():
                     if a.dump_draws or a.predict_only:
                         v_pilot = pilot_predicted_variance(arr, tr, H, prob, cand, others, sd, lam_pair, a.docs_per_query)
                         slack_pilot = float(min(eps - D_known[j].mean() for j in others))    # pilot estimate of the binding slack
+                        j_bind = min(others, key=lambda j: eps - D_known[j].mean())
+                        sb2_pilot = float(D_known[j_bind].var(ddof=1)) if len(tr) > 1 else float("nan")   # between-query variance of D (binding comparison) on the pilot
                     if a.predict_only:
                         for m in ARMS:
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw, pilot=int(pilot_docs),
-                                                  v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, n_queries=N, cand=int(cand)))
+                                                  v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, sb2_pilot=sb2_pilot,
+                                                  n_queries=N, n_train=int(a.n_train), cand=int(cand)))
                         # replay the random-number consumption of the audit so that later draws use the same permutations as the full run
                         for k in q_w:
                             n_k = len(arr[k][0])
@@ -253,8 +256,8 @@ def main():
                         if a.dump_draws:
                             draw_rows.append(dict(collection=held, judge=a.judge, budget_full_eq=Bq, eps=eps, method=m, draw=i_draw,
                                                   docs=int(L[m].cost), pilot=int(pilot_docs), act=int(ok), wrong=int(ok and regret > eps), regret=regret,
-                                                  v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, slack_true=eps - regret,
-                                                  n_queries=N, b=int(b), n_sampled=int(len(q_w))))
+                                                  v_pilot=v_pilot[m], v_pilot_ref=v_pilot["weighted"], slack_pilot=slack_pilot, sb2_pilot=sb2_pilot, slack_true=eps - regret,
+                                                  n_queries=N, n_train=int(a.n_train), b=int(b), n_sampled=int(len(q_w))))
                         for kk in cnt_alt[m]:
                             cnt_alt[m][kk] += ok_alt[kk]
                 _tick(f"cell B={Bq} eps={eps} done ({a.draws} draws)")

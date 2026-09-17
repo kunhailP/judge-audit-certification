@@ -22,9 +22,11 @@ For every (collection, judge, eps) this script reports, per arm:
     the same draw at the budget nearest the reference J50 (draw-level truth, noisy).
 Output: 05_results/unified/PILOT_RULE_eps{eps}.csv and a printed table.
 """
-import argparse, glob, math, os
+import argparse, glob, importlib.util, math, os
 import numpy as np, pandas as pd
 from scipy.stats import t as tdist
+_spec = importlib.util.spec_from_file_location("costpredict", os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib", "costpredict.py"))
+cp = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(cp)
 
 HUB = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 R = os.path.join(HUB, "05_results")
@@ -52,6 +54,14 @@ def main():
     d = pd.concat([pd.read_csv(f) for f in files], ignore_index=True); d = d[d.eps == a.eps]
     if "v_pilot" not in d:
         raise SystemExit("draw files predate the pilot prediction columns; re-run 81 with --dump_draws")
+    if "sb2_pilot" not in d or d.sb2_pilot.isna().all():
+        # older draw records: take sb2_pilot / n_train from the matching predict-only records (same permutations)
+        pf = sorted(glob.glob(a.glob.replace("_draws.csv", "_predict.csv")))
+        if pf:
+            pr = pd.concat([pd.read_csv(f) for f in pf], ignore_index=True)[["collection", "judge", "budget_full_eq", "eps", "method", "draw", "sb2_pilot", "n_train"]]
+            d = d.drop(columns=[c for c in ["sb2_pilot", "n_train"] if c in d]).merge(pr, on=["collection", "judge", "budget_full_eq", "eps", "method", "draw"], how="left")
+        else:
+            d["sb2_pilot"] = np.nan; d["n_train"] = 20
     rows = []
     for (c, j), g in d.groupby(["collection", "judge"]):
         curves = g.groupby(["method", "budget_full_eq"], as_index=False).agg(docs=("docs", "mean"), act=("act", "mean"), pilot=("pilot", "mean"))
@@ -73,6 +83,9 @@ def main():
             pred_saving = (1 - vr) * share
             s_hat = ref.slack_pilot.clip(lower=1e-4); L_pred = z ** 2 * b_ref * ref.v_pilot / s_hat ** 2
             share_pred = (L_pred / (L_pred + P)).reindex(vr.index); pred_saving_pilot = (1 - vr) * share_pred
+            n_tr = int(ref.n_train.iloc[0]) if "n_train" in ref and np.isfinite(ref.n_train.iloc[0]) else 20
+            L2 = pd.Series([cp.l_post_v2(v, sb, sl, z, int(g.n_queries.iloc[0]), n_tr, b_ref) for v, sb, sl in zip(ref.v_pilot, ref.sb2_pilot if "sb2_pilot" in ref else [np.nan] * len(ref), ref.slack_pilot)], index=ref.index)
+            share2 = (L2 / (L2 + P)).reindex(vr.index); pred_saving_v2 = (1 - vr) * share2
             obs_cost_ratio = (J[m] - P) / (J[REF] - P); obs_saving = 1 - J[m] / J[REF]
             rows.append(dict(collection=c, judge=j, eps=a.eps, method=m, pilot=P, J50_ref=J[REF], J50=J[m], post_pilot_share=share,
                              vr_pred_med=float(vr.median()), vr_pred_q25=float(vr.quantile(0.25)), vr_pred_q75=float(vr.quantile(0.75)),
@@ -80,6 +93,8 @@ def main():
                              L_post_obs=J[REF] - P, L_post_pred_med=float(L_pred.median()), L_post_pred_q25=float(L_pred.quantile(0.25)), L_post_pred_q75=float(L_pred.quantile(0.75)),
                              share_pred_med=float(share_pred.median()), saving_pred_pilot_med=float(pred_saving_pilot.median()),
                              frac_draws_recommend_pilot=float((pred_saving_pilot > a.tau).mean()),
+                             L_post_pred_v2_med=float(L2.median()), saving_pred_v2_med=float(pred_saving_v2.median()),
+                             frac_draws_recommend_v2=float((pred_saving_v2 > a.tau).mean()),
                              frac_draws_recommend=float((pred_saving > a.tau).mean()),
                              cell_truth=int(obs_saving > a.tau),
                              slack_pilot_med=float(ref.slack_pilot.median()), slack_true_med=float(ref.slack_true.median())))
@@ -90,12 +105,16 @@ def main():
         print(f"\ncorr(pilot-predicted variance ratio, realised post-pilot cost ratio) = {np.corrcoef(np.log(t.vr_pred_med), np.log(t.cost_ratio_obs))[0,1]:.3f}")
         print(f"corr(pilot-predicted total saving, realised) = {np.corrcoef(t.saving_pred_med, t.saving_obs)[0,1]:.3f}; MAE = {np.abs(t.saving_pred_med - t.saving_obs).mean():.3f}  (post-pilot share taken from the realised reference J50)")
         print(f"fully pilot-based (share predicted from pilot slack): corr = {np.corrcoef(t.saving_pred_pilot_med, t.saving_obs)[0,1]:.3f}; MAE = {np.abs(t.saving_pred_pilot_med - t.saving_obs).mean():.3f}")
+        print(f"fully pilot-based, v2 predictor (two-stage variance, known pilot part): corr = {np.corrcoef(t.saving_pred_v2_med, t.saving_obs)[0,1]:.3f}; MAE = {np.abs(t.saving_pred_v2_med - t.saving_obs).mean():.3f}")
+        u = t.drop_duplicates(["collection", "judge"])
+        print("post-pilot labels of weighted: realised vs v1 vs v2 (medians): " + "; ".join(f"{r.collection}/{r.judge} {r.L_post_obs:.0f} vs {r.L_post_pred_med:.0f} vs {r.L_post_pred_v2_med:.0f}" for r in u.itertuples()))
         u = t.drop_duplicates(["collection", "judge"])
         print(f"post-pilot labels of weighted: realised vs pilot-predicted median: " + "; ".join(f"{r.collection}/{r.judge} {r.L_post_obs:.0f} vs {r.L_post_pred_med:.0f} [{r.L_post_pred_q25:.0f}, {r.L_post_pred_q75:.0f}]" for r in u.itertuples()))
         jd = t[t.method.isin(["weighted_cvl", "weighted_cv", "ai_resid", "ai_robust_0.3", "ai_calib"])]
-        dec = (jd.frac_draws_recommend > 0.5).astype(int)
-        print(f"decision 'saving > {a.tau}' (majority of pilots) vs cell truth: accuracy {(dec == jd.cell_truth).mean():.2f} on {len(jd)} judge cells; "
-              f"false recommendations {int(((dec == 1) & (jd.cell_truth == 0)).sum())}, missed {int(((dec == 0) & (jd.cell_truth == 1)).sum())}")
+        for col, lab in [("frac_draws_recommend", "share from realised J50"), ("frac_draws_recommend_pilot", "fully pilot-based v1"), ("frac_draws_recommend_v2", "fully pilot-based v2")]:
+            dec = (jd[col] > 0.5).astype(int)
+            print(f"decision 'saving > {a.tau}' ({lab}) vs cell truth: accuracy {(dec == jd.cell_truth).mean():.2f} on {len(jd)} judge cells; "
+                  f"false recommendations {int(((dec == 1) & (jd.cell_truth == 0)).sum())}, missed {int(((dec == 0) & (jd.cell_truth == 1)).sum())}")
 
 
 if __name__ == "__main__":
