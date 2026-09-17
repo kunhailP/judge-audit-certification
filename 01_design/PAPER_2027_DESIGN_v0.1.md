@@ -1217,3 +1217,25 @@ coef-1 CV + inv on ANTIQUE: −5.1 [−8.8,−1.6] → 진짜 손실; λ-fit이 
 개발 4 collection에서 규칙(τ=5%, b_ref=4, 과반 pilot)을 고정했으므로, 새 collection에서 **실행 전에** 예측을 기록하고 실측과 대조한다.
 후보: TREC DL 2019/2020 fully judged pool(번들의 trecdl stack에 _llm 판정이 있는지 확인 필요), Touché 2020·TREC-COVID(judged stack; _llm 파일 없음 → 66으로 Qwen3-8B 판정 생성 필요, GPU 있음).
 절차: (a) pilot 20 query만으로 v_pilot·slack 계산 → 예측 파일 커밋(해시 고정), (b) 81 전체 실행, (c) 97로 채점. 예측 자체가 코드로 결정되므로 "사전 등록"은 예측 파일의 커밋 시점으로 증명.
+
+### 16.8 Held-out 검증 1차 — TREC-COVID(50 query)·Touché 2020(49 query), reranker 판정자 (2026-09-17)
+프로토콜: `81 --predict_only`로 pilot 기록만 생성 → `98_heldout_predict.py`로 예측 고정·커밋(7deb082; 수정본 ff6f6df) → 감사(300 draws, 예산 2–45) → `97`로 채점.
+예측 기록과 감사의 pilot 열은 정확히 일치(차이 0). 첫 lock의 98에 slack 제곱 누락 버그가 있었고(L_post만 영향), LOCK_NOTE.md에 공개.
+결과 파일: `05_results/heldout/PILOT_RULE_rr_{ho,ho10}_eps*.csv`, `PREDICTIONS_rr*.md`.
+
+**(1) 사전 고정 예측 중 맞은 것 (pilot 20)**: arm별 pilot 이후 비용비 corr(예측, 실측) = 0.957 (ε=0.02) / 0.971 (ε=0.01), 전 arm 대상.
+D3(λ-CV vs coef-1) 2/2 — COVID에서는 coef-1이 낫다고 예측했고 실제로 그랬음(비용비 0.47 vs 0.75). 분해 예측 uniform→nz 0.50/0.28 vs 실측 0.46/0.28.
+**(2) 틀린 것**: v1 공식의 pilot 이후 라벨 수 592 vs 실측 203 (COVID), 246 vs 58 (Touché) — 3–4배 과대. 원인 두 가지를 확인:
+  (a) 모집단 estimand에서 pilot 부분(N=50 중 20)이 정확히 알려져 나머지에 요구되는 정밀도가 N/N_R(=1.67)배 느슨함 → 라벨 (N_R/N)²=0.36배;
+  (b) v1은 f=1을 가정(작은 예산에서 query 간 분산이 남는 효과 무시).
+**(3) 예측기 개선 (held-out을 본 뒤 만든 것이므로 사전 등록 예측이 아님을 명시)** — `lib/costpredict.py`
+| 예측기 | 내용 | dev 18셀 결정 정확도 ε=.02/.01 | dev L_post (CAsT, DBpedia) | held-out pilot20 결정 | held-out pilot10 결정 | held-out L_post (COVID, Touché) |
+|---|---|---|---|---|---|---|
+| v1 | z²·b·v/s² | 14/18, 14/18 | 828, 793 (실측 1152, 1514) | 3/4, 1/4 | 2/4, 2/4 | 592, 246 (실측 203, 58) |
+| v2 | 2단계 분산 + 알려진 pilot 부분 | 14/18, 14/18 | 633, 751 | 4/4, 4/4 | 2/4, 2/4 | 213, 88 |
+| v3 | v2를 비교별로 계산해 max (구속 비교 = max v/s²) | 15/18, 14/18 | 636, 642 | 4/4, 4/4 | 4/4, 3/4 | 215, 46 |
+| v4 | v2 + 교차적합 slack(후보 선택 반쪽/slack 측정 반쪽) | 16/18 (오권고 0), 14/18 (오권고 0) | 1541, 1684 (과대); ε=.01 CAsT 발산 | 4/4, 4/4 | 3/4, 3/4 | 215, 89 |
+판독: **비용비(어느 arm, 상대적으로 얼마)는 pilot만으로 안정적으로 예측된다(상관 0.95–0.97, dev·held-out 모두).** 절대 라벨 수는 v2/v3로 held-out에서 맞고
+dev의 CAsT·DBpedia에서는 여전히 ~2배 과소 — 그 두 collection은 정책이 가깝고(true slack≈ε) pilot 20 query의 slack 추정이 winner's curse로 낙관적임
+(plain 0.037/0.039 → 교차적합 0.023/0.025). 교차적합(v4)은 낙관을 없애 오권고 0이 되지만 slack이 작을 때 불안정. 논문에는 v3를 "개선안", v4를 "보수적 변형"으로.
+결정 규칙의 요약: 오권고를 피하려면 v4, 누락을 피하려면 v3. dev에서 두 규칙이 일치하는 셀은 ε=.02에서 17/18(그중 15 정답), ε=.01에서 12/18(그중 11 정답); 불일치 셀은 모두 실측 절감이 문턱 5% 근처(0.03–0.06)이거나 CAsT ε=.01처럼 v4의 slack이 발산한 경우.
