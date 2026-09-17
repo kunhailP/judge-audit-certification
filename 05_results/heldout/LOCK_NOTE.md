@@ -14,3 +14,9 @@
   audit; judgments generated with 66_llm_judge.py on this machine (accuracy 0.764 / 0.804, matching the manuscript's 0.76 / 0.79).
   Audit run afterwards; pilot columns of the audit records equal the locked records (max difference 0). Scoring:
   PILOT_RULE_llm_{ho,ho10}_eps*.csv.
+- 2026-09-17 (review of 5210aee): `81 --predict_only` had overwritten the audit summary CSVs (*_v2_shared_full_t.csv) with empty files
+  when it ran after the audits; the 84 development summaries were restored from the Track C commit (3b4ebd5) and the reranker held-out
+  audits were re-run (draw records identical to the committed ones, max difference 0; 11 new pilot columns added). The bug is fixed
+  (predict-only never writes the summary). Order of events for the held-out test: reranker audit scored -> v2-v4 written -> Qwen3-8B
+  judgments generated -> v1-v4 locked -> Qwen3-8B audit -> v3 designated primary. 97_pilot_rule.py now also scores the executable
+  single-pilot rule (PILOT_RULE_single_eps*.csv).

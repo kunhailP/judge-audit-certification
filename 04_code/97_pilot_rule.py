@@ -107,6 +107,32 @@ def main():
                              frac_draws_recommend=float((pred_saving > a.tau).mean()),
                              cell_truth=int(obs_saving > a.tau),
                              slack_pilot_med=float(ref.slack_pilot.median()), slack_true_med=float(ref.slack_true.median())))
+    # ---- the executable single-pilot rule (review 2026-09-17 item 3): in every draw, the auditor sees ONE pilot and must choose.
+    # Rule: use the lambda-fitted judge control variate iff this draw's pilot predicts (v3) a saving above tau, else humans-only
+    # decision-weight sampling. The chosen arm's realised cost and certificate outcome define the rule's own ACT curve and J50.
+    rule_rows = []
+    for (c, j), g in d.groupby(["collection", "judge"]):
+        if not {"weighted", "weighted_cvl"} <= set(g.method.unique()) or "slack_c0" not in g:
+            continue
+        P = float(g.pilot.mean()); N = int(g.n_queries.iloc[0]); z = float(tdist.ppf(1 - 0.10 / 6, N - 21))
+        n_tr = int(g.n_train.iloc[0]) if "n_train" in g and np.isfinite(g.n_train.iloc[0]) else 20
+        w = g[g.method == "weighted"].set_index(["budget_full_eq", "draw"]); cvl = g[g.method == "weighted_cvl"].set_index(["budget_full_eq", "draw"])
+        idx = w.index.intersection(cvl.index); w = w.loc[idx]; cvl = cvl.loc[idx]
+        L3 = np.array([cp.l_post_v3(r, z, N, n_tr, 4) for r in w.to_dict("records")]); share = L3 / (L3 + P)
+        pred = (1 - cvl.v_pilot.values / w.v_pilot.values) * share; use = pred > a.tau
+        docs = np.where(use, cvl.docs.values, w.docs.values); act = np.where(use, cvl.act.values, w.act.values); wrong = np.where(use, cvl.wrong.values, w.wrong.values)
+        rr = pd.DataFrame(dict(budget=w.index.get_level_values(0), docs=docs, act=act, wrong=wrong, use=use)).groupby("budget").mean()
+        curves = {"weighted": w.groupby(level=0).agg(docs=("docs", "mean"), act=("act", "mean")), "weighted_cvl": cvl.groupby(level=0).agg(docs=("docs", "mean"), act=("act", "mean")), "rule": rr}
+        J = {k: j50(v.docs, v.act) for k, v in curves.items()}
+        rule_rows.append(dict(collection=c, judge=j, eps=a.eps, J50_weighted=J["weighted"], J50_cvl=J["weighted_cvl"], J50_rule=J["rule"],
+                              saving_always_cvl=1 - J["weighted_cvl"] / J["weighted"], saving_rule=1 - J["rule"] / J["weighted"],
+                              frac_pilots_use_judge=float(use.mean()), wrong_rule_max=float(rr.wrong.max()),
+                              pilot_agreement=float((use == ((1 - J["weighted_cvl"] / J["weighted"]) > a.tau)).mean())))
+    ru = pd.DataFrame(rule_rows)
+    if len(ru):
+        ru.to_csv(os.path.join(R, "unified", f"PILOT_RULE_single_eps{a.eps}.csv"), index=False)
+        print("\n== executable single-pilot rule (choose lambda-CV iff this draw's pilot predicts saving > tau, else weighted):")
+        print(ru.round(3).to_string(index=False))
     t = pd.DataFrame(rows); os.makedirs(os.path.join(R, "unified"), exist_ok=True)
     t.to_csv(os.path.join(R, "unified", f"PILOT_RULE_eps{a.eps}.csv"), index=False)
     pd.set_option("display.width", 250); print(t.round(3).to_string(index=False))

@@ -1279,3 +1279,10 @@ reranker(v1만 사전 고정; v2–v4는 사후): v2–v4 8/8, v1 4/8.
 - 그림: `99_figures.py` + `lib/figstyle.py`로 F4–F9를 저장된 CSV/parquet에서 한 스타일(STIX 서체, 그림 내 제목 없음, Okabe–Ito 팔레트, 읽을 수 있는 collection·판정자 이름, 범례 바깥)로 재생성. F5는 `planner_v2/judged_*_ext/planner_v2.parquet`에서 누적 ACT를 다시 계산.
 - 문체: "Three things follow", "It is tempting to read", 자화자찬성 표현, 문장 중간의 em-dash 삽입구를 제거·분리. 수치 불변.
 - 커밋 메시지의 co-author trailer는 저장소 규약(§12.9)에 따라 제거, 로컬 commit-msg hook 설치.
+
+### 16.13 리뷰(5210aee) 대응 (2026-09-17)
+1. **재현 오류 복구**: `81 --predict_only`가 감사 요약 CSV를 빈 파일로 덮어쓰던 버그 수정(예측 분기를 요약 저장 앞으로). dev 84개 요약은 Track C 커밋(3b4ebd5)에서 복원, reranker held-out은 재감사(draw 기록 값 동일, 열 11개 추가). `86 v3`가 TABLE2_v3를 그대로 재생성함을 확인. 이름 충돌 잔해(`_heldout_b*`) 삭제.
+2. **단일 pilot 실행 규칙** (`97`, `PILOT_RULE_single_eps*.csv`): draw마다 그 pilot의 v3 예측 절감 > 5%면 λ-CV, 아니면 weighted. ε=0.02 절감(항상 λ-CV / 규칙): ANTIQUE 7.8/5.8, CAsT Qwen 19.1/19.1, CAsT rr 13.6/10.4, DBpedia 19.5/18.4·19.4/19.2, DL 3.4/2.9, 반전 판정자 1.6·4.8(잡음)/0(채택 안 함); held-out Qwen pilot 20: COVID 6.4/5.7, Touché 2.7/0.9; pilot 10: 14.8/14.8, 7.4/7.5. 규칙의 wrong-cert 0. pilot별 일치율 dev 45–98%(DL 21–23은 문턱 근처라 45%), held-out Qwen 52–99%.
+3. **held-out 서술 정정**: "개발에 안 쓴 collection"이 아니라 "reranker 결과를 본 뒤 v2–v4를 만들고, 같은 collection에서 새 판정자(Qwen3-8B)로 v1–v4를 사전 고정"; v3를 주 예측기로 지정한 시점(결과 이후)을 명시. 다수결 8/8과 단일 pilot 성능을 분리해 서술.
+4. 원고: Prop. A 증명을 유한 N으로, F8 캡션 175→193, F8을 본문 §5.3으로, F5를 부록 E로 이동.
+5. 남은 것: 개발에 전혀 쓰지 않은 큰 collection에서 규칙 하나를 고정한 독립 검증(§16.7의 최종 실험).

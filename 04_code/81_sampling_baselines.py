@@ -297,9 +297,9 @@ def main():
     out = os.path.join(HUB, "05_results", "sampling_baselines"); os.makedirs(out, exist_ok=True)
     suffix = "" if a.legacy else f"_v2_{a.sampling}_{a.pilot_cost}_{a.bound}"
     stem = f"baselines_{a.stack}_{a.judge}{'_forceworst' if a.force_worst else ''}{'_boundary' if a.boundary else ''}{a.tag}{suffix}"
-    pd.DataFrame(rows).to_csv(os.path.join(out, stem + ".csv"), index=False)
-    if a.predict_only:
+    if a.predict_only:   # predictions only: never touch the summary file of the audit (bug fixed 2026-09-17: it was overwritten with an empty file)
         pd.DataFrame(draw_rows).to_csv(os.path.join(out, stem + "_predict.csv"), index=False); return
+    pd.DataFrame(rows).to_csv(os.path.join(out, stem + ".csv"), index=False)
     if a.dump_draws:
         pd.DataFrame(draw_rows).to_csv(os.path.join(out, stem + "_draws.csv"), index=False)
 
