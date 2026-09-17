@@ -1156,8 +1156,21 @@ oracle의 objective는 static 대비 1.5–2.2× (CAsT ε=0.01은 13×) 좋지�
   slack-가중 분산이므로 16.1의 "objective가 인증 불가능 draw에 지배" 현상은 그쪽에서도 실무적 함의를 가진다(주장은 우리 데이터 범위로 한정).
 → 기여 문장 후보: "판정자·표집 설계의 가치는 (분산 감소) × (pilot 이후 비중)으로 pilot에서 사전 계산되며, 이 규칙이 [검증 결과]를 맞힌다."
 
-### 16.3 질의 단위 mechanism map 계산기 — `96_ppi_calculator.py` (결과는 실행 완료 후 추가)
-(ρ, σ, gap, n, N_unlab, ε)만으로 F6를 재현하는지, λ 추정 잡음·clip·finite-N λ가 각각 얼마나 기여하는지.
+### 16.3 질의 단위 mechanism map 계산기 — `96_ppi_calculator.py`, `05_results/rho_map/CALCULATOR_vs_map.csv`, F9
+설정: 저장소의 인증 코드(pick_candidate, ucb_t, ucb_ppi, cross-fit λ∈[0,1], 순서쌍 6개 Bonferroni)를 그대로, 정책 utility 3개를 가우시안으로 생성
+(쌍별 차이 분산 = ppi_gain의 se_human·√10, 평균 = 모집단 gap, 판정자 쌍별 ρ = 모집단 ρ × 잡음 수준별 감쇠). 셀당 1,000회, T=90.
+| | DBpedia (64셀) | DL 21–23 (32셀) |
+|---|---|---|
+| 인간 단독 ACT corr(sim, map) / MAE | 0.994 / 0.087 (작은 ε에서 가우시안이 과소) | 0.981 / 0.024 |
+| ACT 비율, cross-fit λ: corr / MAE / >1.2 일치율 | **0.854 / 0.055 / 0.92** (sim 7셀 > 1.2 vs map 12셀: 약간 보수적) | 0.735 / 0.028 / 1.00 (손실 0.88–0.97 재현) |
+| 모집단 최적 λ(추정 잡음 없음) | 0.871 / 0.060 / 0.94 | **0.12 / 0.050** — 손실이 사라짐(모두 ≥0.99) |
+| clip 제거 | 0.840 / 0.067 | 0.09 / 0.052 |
+| finite-N λ (÷(1+n/N)) | 0.811 / 0.073 / 0.89 — N_unlab=50에서 1.2를 예측(실측 0.95–0.98) | 0.05 / 0.055 |
+판독: (1) F6는 (ρ, σ, gap, n, N_unlab, ε)로 계산 가능하다. (2) 나쁜 판정자에서의 always-PPI 손실은 **λ 추정 잡음**(22-query fold)의 비용이며 판정자 자체의
+성질이 아니다. (3) finite-N λ 공식은 계수가 알려졌다는 가정이라 추정 시에는 잘못된 보정. (4) No Free Lunch의 추정 문턱(≈0.22)보다 훨씬 높은 ρ가
+필요한 이유는 인증이 threshold event이기 때문 — ρ=0.39에서 분산 이득 ≤1.18이 n/N 희석 후 ACT를 거의 못 움직인다.
+원고 반영: §3 map 문단 끝 + 부록 G(`app:calculator`) + F9. 남은 일: pilot 추정치(ρ̂ BCa, σ̂, ĝap)를 입력으로 넣었을 때의 정확도 — 97과 같은 방식으로
+draw별 예측 vs 실측(63 planner에 --dump 옵션 필요, pools 필요).
 
 ### 16.4 사전 판단 규칙의 검증 절차 — `97_pilot_rule.py` (pools 필요)
 `81 --dump_draws`가 draw별로 기록하는 v_pilot(각 arm의 pilot 기반 within-query 분산, b_ref=4), slack_pilot, slack_true를 사용.
