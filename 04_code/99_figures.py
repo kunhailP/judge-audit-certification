@@ -76,18 +76,20 @@ def f6():
 
 
 def f7():
+    """Relative cost of every arm to humans-only decision-weight sampling (J50 / J50_weighted), eps = 0.02."""
     t = pd.read_csv(os.path.join(R, "unified", "TABLE2_v3_eps0.02.csv"))
     cols = [("antique", "llm"), ("antique", "rr"), ("antique", "inv"), ("cast19", "llm"), ("cast19", "rr"), ("cast19", "inv"), ("dbpedia-entity", "llm"), ("dbpedia-entity", "rr"), ("dl212223", "llm")]
-    arms = ["uniform", "uniform_nz", "weighted", "strat_pilot", "ai_calib", "ai_resid", "ai_robust_0.3", "weighted_cv", "weighted_cvl"]
+    arms = ["uniform", "uniform_nz", "strat_pilot", "ai_calib", "ai_resid", "ai_robust_0.3", "weighted_cv", "weighted_cvl"]
     piv = t.pivot_table(index="method", columns=["collection", "judge"], values="J50")
-    fig, ax = plt.subplots(figsize=(W2, 3.0)); x = np.arange(len(cols)); w = 0.09
+    fig, ax = plt.subplots(figsize=(W2, 2.9)); x = np.arange(len(cols)); w = 0.1
     for i, a in enumerate(arms):
-        vals = [piv.loc[a, c] if c in piv.columns and a in piv.index else np.nan for c in cols]
+        vals = [piv.loc[a, c] / piv.loc["weighted", c] if c in piv.columns and a in piv.index else np.nan for c in cols]
         ax.bar(x + (i - (len(arms) - 1) / 2) * w, vals, w, color=PAL[i % len(PAL)], label=fs.ARMS[a], edgecolor="k", linewidth=0.2)
-    short = {"llm": "Qwen3-8B", "rr": "reranker", "inv": "inverted"}
-    cname = {"antique": "ANTIQUE", "cast19": "CAsT 2019", "dbpedia-entity": "DBpedia", "dl212223": "DL 21\u201323"}
+    ax.axhline(1.0, color="k", lw=0.8); ax.set_ylim(0.6, 2.4)
+    short = {"llm": "Qwen3-8B", "rr": "reranker", "inv": "inverted"}; cname = {"antique": "ANTIQUE", "cast19": "CAsT 2019", "dbpedia-entity": "DBpedia", "dl212223": "DL 21\u201323"}
     ax.set_xticks(x); ax.set_xticklabels([f"{cname[c]}\n{short[j]}" for c, j in cols], fontsize=6)
-    ax.set_ylabel("$J_{50}$ (unique human labels)"); ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=3, fontsize=6.5)
+    ax.set_ylabel("$J_{50}$ relative to decision-weight sampling"); ax.text(len(cols) - 0.5, 1.03, "decision-weight sampling (humans) = 1", ha="right", va="bottom", fontsize=6.5)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=3, fontsize=6.5)
     save(fig, "F7_J50_v3.png", os.path.join(R, "unified"))
 
 

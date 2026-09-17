@@ -134,3 +134,12 @@ regimes and one collection.
 ---
 
 **Status (2026-09-17, later the same day):** all ★ items and items 4, 6, 7, 8, 9, 10, 13, 17, 19, 20, 21, 23 applied in commit after 9b3bf5a; items 12, 22, 25 left as cosmetic (bold run-in headings are TMLR-conformant; "n.r." only in appendix table captions where it is defined; the λ-corrected wording is kept only where the ANTIQUE lock is quoted).
+
+**Second external review (Leaning accept) applied, same day:** (1) introduction and related work now credit PPI (bias removal by a control
+variate) and active inference (label allocation) explicitly and state the contribution as their application to menu certification with
+full cost accounting; contribution 2 retitled "A certificate that keeps PPI's judge-independence under data-driven selection". (2) §5
+states the Poisson-sampling condition of the HT/CV variance formulas (what the implementation does); Appendix B limits "the variance of
+Proposition A" to a fixed fold-λ and says the cross-fitted λ's variation is not bounded by the proposition. (3) Oracle allocation saving
+quoted as 0–14% at ε=0.02 (1–17% at ε=0.01) in abstract, contribution 3 and §8. Abstract cut to ~290 words. Table 4 (held-out
+predictions vs realised savings vs single-pilot rule) added; Table 2 highlights the two rows the text discusses; Figure 3 redrawn as
+cost relative to the human-only reference arm.
