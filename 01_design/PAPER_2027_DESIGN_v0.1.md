@@ -1178,3 +1178,8 @@ draw별 예측 vs 실측(63 planner에 --dump 옵션 필요, pools 필요).
 - 판단: "판정자 CV 사용 권고 iff 예측 절감 > τ(=0.05)" 를 draw별로 내리고 셀 실측 J50과 대조(정확도, 오권고, 누락).
 - 검증 설계: 개발 4 collection에서 규칙을 고정 → 새 collection 1개(후보: TREC DL 2019/2020 fully judged pool, 또는 Touché/COVID를 문서 단위로)에
   **실행 전 예측을 기록**(pilot 20 query만 사용) → 실측과 대조. 이것이 Featured 주장의 핵심 실험.
+
+### 16.5 GPU 머신에서 실행할 것 — `04_code/RUN_TRACK_C.sh`
+v3 격자 그대로 81을 `--dump_draws`로 재실행(`uniform_nz`는 별도 rng 스트림이라 기존 arm 수치는 정확히 재현) → `86 v3`, `95`, `94`, `97`.
+판독 순서: (1) uniform→uniform_nz→weighted 분해, (2) 절감률의 부트스트랩 구간, (3) pilot 규칙의 정확도(셀 18개). 규칙이 맞으면 §16.4의 held-out 검증으로.
+

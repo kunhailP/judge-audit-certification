@@ -11,7 +11,7 @@ result files under `05_results/` by the scripts under `04_code/`.
 - `04_code/67,70,72,77` — PPI gain, neutrality diagnostic, self-preference test, mechanism map (F6)
 - `04_code/80–83` — document-level auditing: decision-weighted sampling, judge control variate (coefficient 1 and pilot-lambda), sampling baselines, faithful active inference, menu-level allocation
 - `04_code/84–85` — unified metric J50 and Figure F7; `86` — set-F1 linearised audit; `88` — pre-registered report
-- `04_code/93_plot_F4.py` — Figure F4 and its quoted correlations from the ppi_gain CSVs; `94_j50_ci.py` — bootstrap intervals for J50 and savings ratios from `81 --dump_draws` records
+- `04_code/93_plot_F4.py` — Figure F4 and its quoted correlations from the ppi_gain CSVs; `94_j50_ci.py` — bootstrap intervals for J50 and savings ratios from `81 --dump_draws` records; `95_cost_model.py` — variance-dilution cost model on the stored results; `96_ppi_calculator.py` — simulated mechanism map; `97_pilot_rule.py` — pre-audit rule evaluation; `RUN_TRACK_C.sh` — the re-run that feeds 94/97
 - `03_data/PROSPECTIVE_LOCK_v0.4/v0.5/v0.6` — pre-registration documents (committed before the target data were analysed)
 - `06_paper/tmlr_submission` — LaTeX source and compiled PDF; `06_paper/THEORY_v0.1.md` — propositions and proofs
 - `01_design/PAPER_2027_DESIGN_v0.1.md` — complete development log including negative results and retractions

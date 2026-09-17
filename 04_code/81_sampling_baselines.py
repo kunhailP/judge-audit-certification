@@ -132,6 +132,7 @@ def main():
     if a.train_dir:
         pv.JUDGE = "rr"; data.update(pv.load_train_only(a.train_dir, a.train_names)); pv.JUDGE = a.judge
     rng_global = np.random.default_rng(0); rng = np.random.default_rng(31)
+    rng_nz = np.random.default_rng(1031)   # own stream for the 2026-09-17 arm, so that every other arm's draws are unchanged
     M = len(MENU); a_sim = ALPHA / (M * (M - 1)); rows = []; draw_rows = []
     for held in [d for d in data if d not in pv.TRAIN_ONLY]:
         P, structs, reg = pv.fit_lodo(data, held, rng_global)
@@ -202,13 +203,14 @@ def main():
                         for m in ARMS:
                             key = SAMPLER_OF.get(m, m)
                             if a.sampling == "shared":
-                                pi = sample_pi(shared_base(bases, key, others), b, n); samp = (rng.random(n) < pi) & (pi > 0)
+                                pi = sample_pi(shared_base(bases, key, others), b, n)
+                                samp = ((rng_nz if m == "uniform_nz" else rng).random(n) < pi) & (pi > 0)
                                 L[m].request(qid, np.flatnonzero(samp), pool_size=n)
                                 for j in others:
                                     v, lo, hi, vv = estimate(m, W[j], r, rj, pi, samp, lam_pair[j]); est[m][j].append(v); rng_lo[m][j].append(lo); rng_hi[m][j].append(hi); vh[m][j].append(vv)
                             else:
                                 for j in others:
-                                    pi = sample_pi(bases[j][key], b_pair, n); samp = (rng.random(n) < pi) & (pi > 0)
+                                    pi = sample_pi(bases[j][key], b_pair, n); samp = ((rng_nz if m == "uniform_nz" else rng).random(n) < pi) & (pi > 0)
                                     L[m].request(qid, np.flatnonzero(samp), pool_size=n)
                                     v, lo, hi, vv = estimate(m, W[j], r, rj, pi, samp, lam_pair[j]); est[m][j].append(v); rng_lo[m][j].append(lo); rng_hi[m][j].append(hi); vh[m][j].append(vv)
                     for m in ARMS:
