@@ -2,8 +2,8 @@
 
 Research artifact for the manuscript *Certifying Retrieval Policies with Non-Neutral AI Judges: What a Judge Saves, and How a
 Pilot Predicts It* (under review at TMLR). Every number in the paper is regenerated from the row-level result files under
-`05_results/` by the scripts under `04_code/`; the commit history is the pre-registration record (lock documents were committed
-before the data they govern were touched; see `03_data/` and `05_results/heldout/LOCK_NOTE.md`).
+`05_results/` by the scripts under `04_code/`; the lock documents under `03_data/` and the log in `05_results/heldout/LOCK_NOTE.md`
+are the pre-registration record (see the section below for what the commit history does and does not show).
 
 ## Layout
 | Path | Content |
@@ -47,6 +47,16 @@ sufficient for every experiment except re-running a judge.
 NeuCLIRBench test of the pre-audit rule. `05_results/heldout/LOCK_NOTE.md` lists, in order, every lock commit, every audit, the
 one formula bug found in a lock, and which predictors were fixed before or after which audit. Nothing in that note is edited
 after the fact except to append.
+
+What the commit history shows: the held-out prediction locks (`54deba0`, `694e00b`) and the NeuCLIRBench lock v0.7 (`1750865` text,
+`b833065` / `ad91bfd` predictions) are separate commits that precede the audits they govern. What it does not show: the locks v0.4–v0.6
+entered this repository in its first commit together with their results (they were written in the private development repository
+before the target data were accessed), and the history was rewritten once for attribution, so commit timestamps are not independent
+evidence of timing. Readers who need such evidence should treat the pre-registration as self-reported.
+
+Pilot-rule scores: `05_results/unified/PILOT_RULE_eps*.csv` and `PILOT_RULE_single_eps*.csv` (development collections) and
+`05_results/heldout/PILOT_RULE_single_{llm,rr}_{ho,ho10}_eps*.csv` (TREC-COVID / Touché) are the outputs of `97_pilot_rule.py` on the
+release draw records; they are committed so that Table 4 and the in-text rule numbers can be checked without the release assets.
 
 ## Licence
 Code: MIT. Result files: CC BY 4.0. Pooled document texts are not redistributed here.

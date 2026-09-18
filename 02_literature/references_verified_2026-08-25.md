@@ -121,3 +121,22 @@
 38. Waudby-Smith, I., Ramdas, A. (2024). "Estimating means of bounded random variables by betting." JRSS-B 86(1), 1–27. (32번 확인 승격; `lib/certificates.py`의 `ucb_bet` 근거)
 39. Horvitz–Thompson under unequal probability sampling: 불편이지만 분산·범위가 1/π_i로 악화(교과서적 사실). — 방향 2의 핵심 질문
     "Can exact finite-sample validity coexist with aggressive importance sampling?"의 배경.
+
+
+## Batch 5 — 데이터셋·모델·통계 도구 (2026-09-18 추가, arXiv/DBLP/ACM DL/Springer 페이지에서 제목·저자·연도·venue 확인)
+
+- Thakur et al. (2021) BEIR, NeurIPS 2021 Datasets and Benchmarks. arXiv:2104.08663. `thakur2021beir`
+- Bajaj et al. (2016) MS MARCO. arXiv:1611.09268 (현재 arXiv 저자 순서). `bajaj2016msmarco`
+- Craswell et al. TREC DL overviews 2019 (arXiv:2003.07820), 2020 (arXiv:2102.07662), 2021 (arXiv:2507.08191), 2022 (arXiv:2507.10865), 2023 (arXiv:2507.08890). `craswell20{20,21}dl{19,20}`, `craswell202{1,2,3}dl2{1,2,3}`
+- Voorhees et al. (2020) TREC-COVID, ACM SIGIR Forum 54(1). DOI 10.1145/3451964.3451965. `voorhees2020treccovid`
+- Bondarenko et al. (2020) Touché 2020, CLEF 2020, LNCS 12260, pp. 384–395. DOI 10.1007/978-3-030-58219-7_26. `bondarenko2020touche`
+- Hasibi et al. (2017) DBpedia-Entity v2, SIGIR 2017, pp. 1265–1268. DOI 10.1145/3077136.3080751. `hasibi2017dbpedia`
+- Dalton, Xiong, Callan (2020) TREC CAsT 2019 overview. arXiv:2003.13624. `dalton2020cast`
+- Zhang et al. (2025) Qwen3 Embedding. arXiv:2506.05176. `zhang2025qwen3embedding` (Qwen3-Embedding-0.6B, Qwen3-Reranker-0.6B)
+- Yang et al. (2025) Qwen3 Technical Report. arXiv:2505.09388. `yang2025qwen3`
+- Jiang et al. (2023) Mistral 7B. arXiv:2310.06825. `jiang2023mistral`
+- Song et al. (2020) MPNet, NeurIPS 2020. arXiv:2004.09297. `song2020mpnet`
+- Reimers, Gurevych (2019) Sentence-BERT, EMNLP-IJCNLP 2019. arXiv:1908.10084. `reimers2019sbert`
+- Lù (2024) BM25S. arXiv:2407.03618. `lu2024bm25s`
+- Maurer, Pontil (2009) Empirical Bernstein bounds, COLT 2009. arXiv:0907.3740. `maurer2009eb`
+- 고전 (서지 정보는 표준 인용대로, 웹 재확인 생략): Robertson & Zaragoza (2009) FnTIR 3(4):333–389 `robertson2009bm25`; Horvitz & Thompson (1952) JASA 47(260):663–685 `horvitz1952`; Efron (1987) JASA 82(397):171–185 `efron1987bca`; Clopper & Pearson (1934) Biometrika 26(4):404–413 `clopper1934`; Cochran (1977) Sampling Techniques 3rd ed. `cochran1977`.
