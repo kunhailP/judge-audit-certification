@@ -53,7 +53,7 @@ Each query has a pool of 30 documents. The disagreement region between A and B i
 - Metrics: ACT and wrong per budget, total number of labels to reach ACT 50%, non-overlap index (Jaccard) of the decision document sets.
 - Decision: continue if (C) certifies significantly earlier than (A) at the same number of labels and the difference is explained by the non-overlap index; otherwise the exploration ends.
 
-## 4. Results (2026-09-10, `05_results/menu_allocation/`, 300 repetitions, wrong = 0 in all cells)
+## 4. Results (2026-09-10, `04_results/menu_allocation/`, 300 repetitions, wrong = 0 in all cells)
 
 Budget at which ACT ≥ 50% is reached (in fully judged query equivalents), ε=0.02 / ε=0.01:
 

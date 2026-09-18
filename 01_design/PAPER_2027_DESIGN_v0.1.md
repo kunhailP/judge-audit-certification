@@ -77,7 +77,7 @@ decoupled from overall judge accuracy. (Prototype: accuracy 0.95→0.94 while ρ
 - **Theorem C (localization).** If utility is additive over the region, pair-level auditing yields the
   same certificate as query-level auditing at a judgment cost of the ratio `|Δ_{jm}|/|pool|`.
 
-## 5. Prototype results (04_code/proto/80_judge_bias_sim.py, 2026-09-10)
+## 5. Prototype results (03_code/proto/80_judge_bias_sim.py, 2026-09-10)
 
 Policy A = fixed cutoff 8, B = a mixture of the F1-optimal cutoff and a noisy cutoff. On top of a
 random error rate `e`, the judge misjudges "documents retrieved only by B" as relevant with
@@ -143,7 +143,7 @@ bootstrap, the per-look resampling in 50_simulation.py, and the interval reporti
 
 ## 9. Kickoff record (2026-09-10, branch `2027-nonneutral-judge`)
 
-### 9.1 Confirmed facts (synthetic data, `04_code/lib/certificates.py` self-test)
+### 9.1 Confirmed facts (synthetic data, `03_code/lib/certificates.py` self-test)
 
 - **Endpoint-check defect reproduced**: in a single-query example, the endpoint spread is 0.000 while
   the exhaustive breakpoint check gives spread 0.167.
@@ -170,7 +170,7 @@ bootstrap, the per-look resampling in 50_simulation.py, and the interval reporti
   (overall accuracy, ρ, error rates inside and outside the disagreement region).
 - `64_trecdl_pool.py`: fully judged TREC DL 2019/2020 pool (go/no-go #2 testbed).
 
-### 9.4 Go/no-go #1 result — decision structure survives on the modern stack (`05_results/pool_compare/`)
+### 9.4 Go/no-go #1 result — decision structure survives on the modern stack (`04_results/pool_compare/`)
 
 LODO (train on 3, evaluate on 1), 50 replications, set-F1, ε_cal=0.005, ε_sel=0.01.
 modern = legacy with msmarco-MiniLM replaced by Qwen3-Embedding-0.6B (the 4-feature classifier is unchanged).
@@ -194,7 +194,7 @@ The recalibration decision tends to become harder on modern (android cal ok@10 0
 Limitation: since the 4-feature classifier is unchanged, the Qwen3 signal entered only the pool
 construction. A "fully modern" variant with qwen3e_cos as a feature is follow-up work.
 
-### 9.5 Planner v2 results — comparison of certificate variants (`05_results/planner_v2/`, 50 replications, α=0.1)
+### 9.5 Planner v2 results — comparison of certificate variants (`04_results/planner_v2/`, 50 replications, α=0.1)
 
 Methods: `loo_boot` (v0.3 as is), `loo_sim` (LOO + simultaneous correction over all ordered pairs), `split_t` (train/validation split + t),
 `split_ppi` (split_t + Qwen3-Reranker judge PPI++); recalibration: `recal_ep` (v0.3 endpoints), `recal_bp` (exhaustive breakpoints),
@@ -249,7 +249,7 @@ On android the reranker judge is effectively random (0.56–0.61): duplicate-que
 Caution: adding method variants changes the rng consumption order, so the `loo_boot` numbers fluctuate by ±0.04 between runs.
 The final experiment must use an independent rng stream per method.
 
-### 9.6 Go/no-go #2 — judge diagnostics on the fully judged TREC DL pool (`05_results/planner_v2/trecdl`, `05_results/ppi_gain`)
+### 9.6 Go/no-go #2 — judge diagnostics on the fully judged TREC DL pool (`04_results/planner_v2/trecdl`, `04_results/ppi_gain`)
 
 pool = all NIST-judged passages (dl2019 43 queries · 9,260 pairs, dl2020 54 queries · 11,386 pairs), relevant = grade≥2,
 judge = Qwen3-Reranker-0.6B P(yes)≥0.5 (pair accuracy 0.70 / 0.66). Policy parameters are trained on the other year (LODO).
@@ -274,7 +274,7 @@ judge = Qwen3-Reranker-0.6B P(yes)≥0.5 (pair accuracy 0.70 / 0.66). Policy par
   The ESS gain shrinks as T increases because N is small and the Var(d̂)/N term remains (in real deployment with N≫T it approaches the theoretical value).
 - In progress: recompute the same table with Qwen3-8B LLM judgments using the UMBRELA prompt (`66_llm_judge.py`).
 
-### 9.7 F4 — the PPI gain is determined by ρ, and accuracy is irrelevant (`05_results/ppi_gain/F4_gain_vs_rho_rr.png`)
+### 9.7 F4 — the PPI gain is determined by ρ, and accuracy is irrelevant (`04_results/ppi_gain/F4_gain_vs_rho_rr.png`)
 
 Legacy and modern BEIR pools (4 collections × 3 pairs each) + TREC DL (2 × 3 pairs) = 30 (pool, policy pair) points,
 same judge (Qwen3-Reranker), T=10, 300–500 random audit draws.
@@ -537,7 +537,7 @@ degenerates to the human-only certificate. The ρ diagnostic only determines "ho
 
 - Even with the adversarial judge the error rate is maintained and ACT equals human-only (λ→0). That is, **the coverage shortfall of the ρ lower bound
   is a reliability problem for the judge recommendation, not a problem for the final certification guarantee.**
-- Figure F5 (`05_results/planner_v2/F5_act_vs_budget_dbpedia-entity.png`): the gap widens as the budget grows.
+- Figure F5 (`04_results/planner_v2/F5_act_vs_budget_dbpedia-entity.png`): the gap widens as the budget grows.
   ε=0.01 is strict on this menu, so even at T=190 human-only certifies only 32%, versus 49% with the 8B judge.
 - v0.3 (loo_boot) certifies 74% at T=90 but with errors 58/500 [0.089, 0.147]. In the paper it now remains only as a comparison
   method that exhibits the problem.
@@ -1110,14 +1110,14 @@ Goal restated: this paper is completed for **TMLR (Featured target)**; the ICML 
 7. **Description of the exact-bound range**: Appendix E's "the paired precision difference has no a priori range" → the experiments use set-F1 and range [−1,1]; the precision difference for nested cutoffs is
    known in advance as ±(1−k_a/k_b) (k_a=10,k_b=20 → [−0.5,0.5]); set-F1 depends on n_G and is therefore not label-free. Table 6 is the cost of "this bound with the loose range".
 8. **Pre-registration statement**: since the initial release commit of the public history contains the lock and the results together, the timing evidence is the dated lock document and the development log, and the reproducibility note states that this is self-reported.
-9. F4 figure regenerated from the current CSVs (`93_plot_F4.py`, `05_results/ppi_gain/F4_summary.json`).
+9. F4 figure regenerated from the current CSVs (`93_plot_F4.py`, `04_results/ppi_gain/F4_summary.json`).
 
 ### 15.3 Code (runs on the GPU machine that has the pools bundle)
 - `81_sampling_baselines.py`: arm **`uniform_nz`** added — uniform sampling within the documents whose decision weight is nonzero in any comparison (for shared sampling, the union of the per-comparison supports).
   `--dump_draws` records the unique label cost and certification outcome per (draw, arm) in `*_draws.csv`. Synthetic-pool smoke test passed (arm order: uniform, uniform_nz, weighted, …).
 - `86_table2_v2.py`: `uniform_nz` row ("Uniform over decision-relevant documents (humans)"); missing rows are skipped. Also added to `84_unify_metrics.py`.
 - `94_j50_ci.py`: resamples draw indices (per budget) from `*_draws.csv` but applies the same indices to all arms to keep the pairing; outputs bootstrap 95% intervals and MC SE of J50 and of the savings
-  (uniform→uniform_nz, uniform_nz→weighted, uniform→weighted, weighted→weighted_cvl, etc.) → `05_results/unified/J50_CI_eps*.csv`.
+  (uniform→uniform_nz, uniform_nz→weighted, uniform→weighted, weighted→weighted_cvl, etc.) → `04_results/unified/J50_CI_eps*.csv`.
 - Re-run command (same as the v3 grid, `_v3b{B}` tag convention): add `--dump_draws` to the 81 call in `RUN_REVISED_ACCOUNTING.sh`, run per budget, then
   `python3 86_table2_v2.py v3 && python3 94_j50_ci.py --eps 0.02 && python3 94_j50_ci.py --eps 0.01`.
   Reading criterion: if uniform→uniform_nz accounts for most of the savings, the center of the contribution is "identifying decision-relevant documents" rather than "weights"; if uniform_nz→weighted is large, that is the value of |w|-proportional sampling itself.
@@ -1130,7 +1130,7 @@ Goal restated: this paper is completed for **TMLR (Featured target)**; the ICML 
 
 Question: "When a judge (or any sampling design) reduces estimation variance, how much of that translates into actual certification cost savings? Can it be known before the audit?"
 
-### 16.1 Variance-dilution cost model — `95_cost_model.py`, `05_results/unified/COST_MODEL_*.csv`, F8
+### 16.1 Variance-dilution cost model — `95_cost_model.py`, `04_results/unified/COST_MODEL_*.csv`, F8
 Model. Under the population estimand, if all non-pilot queries are audited (f=1 at the budget where J50 is reached), the variance of the bound is mean_q(v_q)/n, and under Poisson sampling with π ∝ base,
 v_q ∝ 1/b (documents per query). Hence variance ∝ v_arm / L_post (L_post = number of labels after the pilot) and certification occurs when z·sqrt(v_arm/L_post) ≤ slack.
 For two arms sharing the same pilot, candidates and slack,
@@ -1165,7 +1165,7 @@ Manuscript: §5.3 paragraph "A cost model that reproduces the table", one senten
   slack-weighted variance, the phenomenon of 16.1 "the objective is dominated by uncertifiable draws" has practical implications there too (claim restricted to the range of our data).
 → Candidate contribution sentence: "The value of a judge or sampling design is pre-computed from the pilot as (variance reduction) × (post-pilot share), and this rule correctly predicts [validation results]."
 
-### 16.3 Query-level mechanism-map calculator — `96_ppi_calculator.py`, `05_results/rho_map/CALCULATOR_vs_map.csv`, F9
+### 16.3 Query-level mechanism-map calculator — `96_ppi_calculator.py`, `04_results/rho_map/CALCULATOR_vs_map.csv`, F9
 Setup: the repository's certification code as is (pick_candidate, ucb_t, ucb_ppi, cross-fit λ∈[0,1], Bonferroni over 6 ordered pairs); the 3 policy utilities generated as Gaussians
 (pairwise difference variance = ppi_gain's se_human·√10, mean = population gap, judge pairwise ρ = population ρ × attenuation per noise level). 1,000 runs per cell, T=90.
 | | DBpedia (64 cells) | DL 21–23 (32 cells) |
@@ -1188,7 +1188,7 @@ Uses v_pilot (each arm's pilot-based within-query variance, b_ref=4), slack_pilo
 - Validation design: fix the rule on the 4 development collections → on 1 new collection (candidates: TREC DL 2019/2020 fully judged pool, or Touché/COVID at the document level)
   **record the predictions before running** (using only the 20 pilot queries) → compare with the observed values. This is the central experiment of the Featured claim.
 
-### 16.5 To run on the GPU machine — `04_code/RUN_TRACK_C.sh`
+### 16.5 To run on the GPU machine — `03_code/RUN_TRACK_C.sh`
 Re-run 81 with `--dump_draws` on the v3 grid as is (`uniform_nz` uses a separate rng stream, so the existing arm numbers are reproduced exactly) → `86 v3`, `95`, `94`, `97`.
 Reading order: (1) uniform→uniform_nz→weighted decomposition, (2) bootstrap intervals of the savings, (3) accuracy of the pilot rule (18 cells). If the rule holds, proceed to the held-out validation of §16.4.
 
@@ -1197,7 +1197,7 @@ Reading order: (1) uniform→uniform_nz→weighted decomposition, (2) bootstrap 
 Execution note: launching all 84 at once initially gave 158 BLAS threads per process × 84 = 13k threads tangled under the 31-core quota, and not a single cell finished in 1.7 hours.
 Restarting with `OMP_NUM_THREADS=1` + 31 concurrent took 8 minutes in total. Reflected in the script. The 1,176 rows of the existing arms are **exactly identical** to the committed version (uniform_nz uses a separate rng).
 
-**(1) Savings decomposition (ε=0.02, paired bootstrap 95%, 300 draws)** — `05_results/unified/J50_CI_eps0.02.csv`
+**(1) Savings decomposition (ε=0.02, paired bootstrap 95%, 300 draws)** — `04_results/unified/J50_CI_eps0.02.csv`
 | collection | uniform→uniform_nz | uniform_nz→weighted | uniform→weighted | J50: uniform / nz / weighted |
 |---|---|---|---|---|
 | ANTIQUE | 21% [16,26] | 25% [21,28] | 40% [37,44] | 1,405 / 1,107 / 836 |
@@ -1230,7 +1230,7 @@ Procedure: (a) compute v_pilot and slack from the 20 pilot queries only → comm
 ### 16.8 Held-out validation round 1 — TREC-COVID (50 queries)·Touché 2020 (49 queries), reranker judge (2026-09-17)
 Protocol: generate only the pilot record with `81 --predict_only` → fix and commit the predictions with `98_heldout_predict.py` (54deba0; corrected version 9ca0f6b) → audit (300 draws, budgets 2–45) → score with `97`.
 The pilot columns of the prediction record and the audit match exactly (difference 0). The first lock's 98 had a bug omitting the square of the slack (affects L_post only), disclosed in LOCK_NOTE.md.
-Result files: `05_results/heldout/PILOT_RULE_rr_{ho,ho10}_eps*.csv`, `PREDICTIONS_rr*.md`.
+Result files: `04_results/heldout/PILOT_RULE_rr_{ho,ho10}_eps*.csv`, `PREDICTIONS_rr*.md`.
 
 **(1) Pre-fixed predictions that were correct (pilot 20)**: per-arm post-pilot cost ratio corr(predicted, observed) = 0.957 (ε=0.02) / 0.971 (ε=0.01), over all arms.
 D3 (λ-CV vs coef-1) 2/2 — on COVID, coef-1 was predicted to be better and it was (cost ratio 0.47 vs 0.75). Decomposition prediction uniform→nz 0.50/0.28 vs observed 0.46/0.28.
