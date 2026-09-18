@@ -267,7 +267,7 @@ Max wrong-certificate rate over all cells at eps=0.02: 0.003
 
 Max wrong-certificate rate over all cells at eps=0.03: 0.003
 
-## Held-out check (eps = 0.03), predictions P1-P3 of REVIEW_RESPONSE §14
+## Held-out check (eps = 0.03), predictions P1-P3 of 03_data/PREREG_pilot_sweep_eps003_2026-09-15.md
 
 | Collection | arm | J50 p10/p20 | J50 p40/p20 | J50 p80/p40 | ACT|feasible min over pilots | oracle saving vs static_sum (pilot 20) | P1 | P2 | P3 |
 |---|---|---:|---:|---:|---:|---:|:-:|:-:|:-:|

@@ -104,10 +104,10 @@ def main():
                 L.append(f"| {NAME[c]} | {m} | " + " | ".join(cells) + " |")
         w = R[(R.eps == eps)].wrong_max.max()
         L.append(f"\nMax wrong-certificate rate over all cells at eps={eps}: {w:.3f}")
-    # ---- pre-registered predictions (REVIEW_RESPONSE §14) on the held-out eps = 0.03 ----
+    # ---- pre-registered predictions (03_data/PREREG_pilot_sweep_eps003_2026-09-15.md) on the held-out eps = 0.03 ----
     H = R[(R.eps == 0.03) & (R.fixed_cand == "pilot")]
     if len(H):
-        L.append("\n## Held-out check (eps = 0.03), predictions P1-P3 of REVIEW_RESPONSE §14\n")
+        L.append("\n## Held-out check (eps = 0.03), predictions P1-P3 of 03_data/PREREG_pilot_sweep_eps003_2026-09-15.md\n")
         L.append("| Collection | arm | J50 p10/p20 | J50 p40/p20 | J50 p80/p40 | ACT|feasible min over pilots | oracle saving vs static_sum (pilot 20) | P1 | P2 | P3 |\n|---|---|---:|---:|---:|---:|---:|:-:|:-:|:-:|")
         for c in NAME:
             for m in ["static_sum", "oracle_exact", "plugin_exact"]:

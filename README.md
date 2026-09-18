@@ -8,9 +8,8 @@ are the pre-registration record (see the section below for what the commit histo
 ## Layout
 | Path | Content |
 |---|---|
-| `01_design/` | Development log (design, every negative result, retraction and post-hoc change; the 2026-09-14 review response; the menu-allocation exploration) |
-| `02_literature/` | Verified reference list |
-| `03_data/` | Pre-registration locks v0.4–v0.7 and the archived manifest of the initial release |
+| `01_design/` | Development log (design, every negative result, retraction and post-hoc change) and the menu-allocation exploration note |
+| `03_data/` | Pre-registration locks v0.4–v0.7, the ε = 0.03 pilot-sweep prediction record, and the archived manifest of the initial release |
 | `04_code/lib/` | `certificates.py` (split / PPI++ certificates, finite-population and betting bounds), `neutrality.py` (ρ bounds), `design.py` (menu allocation), `costpredict.py` (pilot-based cost predictors v1–v4), `ledger.py` (unique-label accounting), `figstyle.py` |
 | `04_code/6x_*.py` | Pool builders (BEIR stacks; fully judged pools for TREC DL, CAsT 2019, ANTIQUE, NeuCLIRBench) and LLM judges |
 | `04_code/63, 67, 70, 72, 77` | Sequential certificates, PPI gain, neutrality diagnostic, self-preference test, mechanism map |
