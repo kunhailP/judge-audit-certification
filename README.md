@@ -26,6 +26,9 @@ Two kinds of row-level records are attached to releases rather than kept in the 
 `97_pilot_rule.py`) and the pilot-only prediction records that were committed as locks before each audit (`*_predict.csv`, release
 `locked-predict-records-v1`; their lock commits remain in the history, and the derived `05_results/heldout/PREDICTIONS_*` files stay
 in the tree). Extract both archives into `05_results/`.
+During double-blind review the archives are not part of the supplementary zip (size); the outputs of the two scripts that need them
+(`05_results/unified/J50_CI_*.csv`, `PILOT_RULE_*.csv`, `05_results/heldout/PILOT_RULE_*.csv`) are committed, and the archives can be
+provided on request through the Action Editor. Every other table and figure regenerates from the committed result files alone.
 
 ## Reproduction
 Requirements: Python 3.11, numpy, pandas, scipy, scikit-learn; for pools and judges also torch, `transformers==4.51.3`,
