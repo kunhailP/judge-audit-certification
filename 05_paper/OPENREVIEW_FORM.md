@@ -10,13 +10,13 @@ Before a retrieval policy is deployed in a new domain, an auditor must certify f
 The author (OpenReview profile required; the PDF and the supplementary material carry no author information).
 
 ## PDF
-`05_paper/tmlr_submission/main.pdf` (24 pages: main content on pages 1–12, references from page 12, appendices A–J from page 14; `\usepackage{tmlr}` without the `[accepted]` option; PDF Author/Title metadata empty).
+`05_paper/tmlr_submission/main.pdf` (24 pages: main content on pages 1–12, references from page 12, appendices A–J from page 15; `\usepackage{tmlr}` without the `[accepted]` option; PDF Author/Title metadata empty).
 
 ## Submission type
 **Regular submission** (no more than 12 pages of main content): the References heading falls on page 12. Re-check after any further edit (the page on which the References heading appears must be at most 13 with the heading not at its top, or at most 12).
 
 ## Supplementary material
-Build with `SUPP_IDENT_REGEX='<account>|<surname>|<given name>|<e-mail>' 05_paper/make_supplementary.sh <out.zip>` from the submission commit. The zip contains the tracked tree without `.git`, without the two release-only record sets (`*_draws.csv`, `*_predict.csv`) and without this file; every table and figure can be regenerated from it (README, "Reproduction"). The script prints any file that still contains one of the identifying strings; the expected answer is `none`. Size must stay below 100 MB. The per-draw records (`*_draws.csv`, 41 MB) and the locked pilot-only records (`*_predict.csv`, 48 MB) are not in the zip: every table and figure regenerates without them, and the outputs of the two scripts that need them (`94_j50_ci.py`, `97_pilot_rule.py`) are committed. If a reviewer asks for them, they can be provided through the Action Editor as an anonymous archive; they are released with the repository on acceptance.
+Build with `SUPP_IDENT_REGEX='<account>|<surname>|<given name>|<e-mail>' RELEASE_DIR=<dir holding the two record archives> 05_paper/make_supplementary.sh <out.zip>` from the submission commit. The zip contains the tracked tree without `.git` and without this file, plus the two record archives under `release/` (`draw_records.tar.gz` 42 MB, `locked_predict_records.tar.gz` 48 MB, both checked to contain no identifying strings), so that every table and figure and the draw-level bootstrap intervals and pilot-rule scores can be regenerated (README, "Reproduction"). The script prints any file that still contains one of the identifying strings; the expected answer is `none`. Total size about 96 MB, under the 100 MB limit; check the printed size.
 
 ## Previous TMLR submission / changes since last submission
 None (first submission). Leave both fields empty.
@@ -31,7 +31,7 @@ N/A (no experiments with human subjects; all human relevance labels are the rele
 CC BY 4.0.
 
 ## Anonymity checklist (double-blind)
-- No GitHub or Hugging Face link in the PDF or in the supplementary zip; the code is attached as the zip. The public repository (personal account) must not be linked anywhere in the submission; make it private again for the review period or use an anonymous mirror.
+- No GitHub or Hugging Face link in the PDF or in the supplementary zip; the code is attached as the zip. TMLR permits earlier public versions of a manuscript; what matters is that the submission itself is anonymous, so the public repository (personal account) must not be linked or named anywhere in the submission. Making it private during review is optional.
 - `git grep -i` for the account name, surname, given name, e-mail and the former repository name returns nothing in the tree.
 - Commit history is not part of the zip; the lock ordering is documented in `04_results/heldout/LOCK_NOTE.md` and Appendix I says it is self-reported.
 - The candidate pools (document texts) are not attached; the README states why and what the pool CSVs contain.

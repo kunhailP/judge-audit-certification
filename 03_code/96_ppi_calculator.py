@@ -10,8 +10,8 @@ ACT ratio with the stored map cell by cell. Variants isolate the mechanisms: ora
 clipping, finite-N lambda. If the simulation reproduces the map, the map is predictable before the audit from quantities a
 pilot can estimate (rho, sigma, gap) plus design quantities (n, N_unlab, eps).
 
-Usage: python3 96_ppi_calculator.py [--draws 2000]
-Outputs: 04_results/rho_map/CALCULATOR_vs_map.csv, F9_calculator.png
+Usage: python3 96_ppi_calculator.py [--draws 1000]   (1,000 audits per cell is what the manuscript reports and what the stored CSV contains)
+Outputs: 04_results/rho_map/CALCULATOR_vs_map.csv (columns act_t_<mode>, act_ppi_<mode>, ratio_<mode> per lambda mode), F9_calculator.png
 """
 import argparse, importlib.util, math, os
 import numpy as np, pandas as pd
@@ -99,7 +99,7 @@ def ucb_ppi_variant(U, Uhat_lab, Uhat_all, cand, alpha_prime, mode, K, r, s):
 
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--draws", type=int, default=2000); ap.add_argument("--seed", type=int, default=7)
+    ap = argparse.ArgumentParser(); ap.add_argument("--draws", type=int, default=1000); ap.add_argument("--seed", type=int, default=7)
     a = ap.parse_args(); rng = np.random.default_rng(a.seed); rows = []
     for coll, jf, mapfile in [("dbpedia-entity", "judged_llm", "rho_map_judged_llm.csv"), ("dl212223", "dlv2_llm", "rho_map_dlv2_llm.csv")]:
         mu, sig, rho0 = pair_params(coll, jf)
@@ -117,7 +117,11 @@ def main():
                                    act_t_map=float(cell.act_t.iloc[0]), act_ppi_map=float(cell.act_ppi.iloc[0]), ratio_map=float(cell.ratio.iloc[0]))
                         for mode in ["crossfit", "oracle", "oracle_noclip", "finiteN"]:
                             at, ap_ = simulate(mu, sig, rho, int(T), int(N_unlab), eps, a.draws, rng, lam_mode=mode)
-                            out[f"act_t_sim"] = at; out[f"act_ppi_{mode}"] = ap_; out[f"ratio_{mode}"] = ap_ / at if at > 0 else float("nan")
+                            # one humans-only denominator per mode (bug fixed 2026-09-18: act_t_sim was overwritten by every mode,
+                            # so the stored column matched only the last mode's ratio; the ratios themselves were always computed
+                            # with their own denominator). act_t_sim is kept as the cross-fitted mode's value for older readers.
+                            out[f"act_t_{mode}"] = at; out[f"act_ppi_{mode}"] = ap_; out[f"ratio_{mode}"] = ap_ / at if at > 0 else float("nan")
+                        out["act_t_sim"] = out["act_t_crossfit"]
                         rows.append(out)
                 print(f"{coll} noise={noise} rho={rmean:.2f} T={T} done", flush=True)
     t = pd.DataFrame(rows); t.to_csv(os.path.join(R, "rho_map", "CALCULATOR_vs_map.csv"), index=False)
@@ -125,7 +129,7 @@ def main():
     for coll, g in t.groupby("collection"):
         g9 = g[g["T"] == g["T"].max()]
         print(f"\n== {coll}: T={g['T'].max()} cells n={len(g9)}")
-        print(f"  humans-only ACT: corr(sim, map)={np.corrcoef(g9.act_t_sim, g9.act_t_map)[0,1]:.3f}  MAE={np.abs(g9.act_t_sim-g9.act_t_map).mean():.3f}")
+        print(f"  humans-only ACT (cross-fitted run): corr(sim, map)={np.corrcoef(g9.act_t_crossfit, g9.act_t_map)[0,1]:.3f}  MAE={np.abs(g9.act_t_crossfit-g9.act_t_map).mean():.3f}")
         for mode in ["crossfit", "oracle", "oracle_noclip", "finiteN"]:
             ok = np.isfinite(g9[f"ratio_{mode}"]) & np.isfinite(g9.ratio_map)
             print(f"  ratio {mode:14s}: corr(sim, map)={np.corrcoef(g9[f'ratio_{mode}'][ok], g9.ratio_map[ok])[0,1]:.3f}  MAE={np.abs(g9[f'ratio_{mode}']-g9.ratio_map)[ok].mean():.3f}"
