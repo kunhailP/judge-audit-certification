@@ -104,15 +104,15 @@ df = pd.DataFrame(rows).drop_duplicates(subset=["block", "collection", "judge", 
 
 # ---------- manuscript table ----------
 def fmt(x):
-    return "미도달" if x != x else f"{x:,.0f}"
+    return "not reached" if x != x else f"{x:,.0f}"
 lines = ["# Tables v0.1 — unified efficiency metric J50 (2026-09-10)", "",
-         "**J50** = 같은 오류 통제(α = 0.10, look × 순서쌍 Bonferroni) 아래 누적 ACT율이 처음 50%에 이르는 시점의 **실제 인간 판정 (query, document) 쌍 수**",
-         "(pilot·학습 query 포함, 실행한 예산 사이는 선형 보간, 최대 예산에서도 50% 미만이면 '미도달'). 잘못된 인증률은 같은 실행의 P(ACT ∧ regret > ε).",
-         "블록 A(query 단위, set-F1, 한 query 감사 = pool 전체 판정)와 블록 B·C(문서 단위, precision@cutoff)는 utility가 달라 블록 간 J50을 직접 비교하지 않는다.", ""]
+         "**J50** = the number of **human-judged (query, document) pairs actually consumed** at which the cumulative ACT rate first reaches 50% under the same error control (α = 0.10, Bonferroni over looks × ordered pairs)",
+         "(pilot and training queries included; linear interpolation between the budgets actually run; 'not reached' if the rate stays below 50% at the largest budget). The wrong-certificate rate is P(ACT ∧ regret > ε) of the same runs.",
+         "Block A (query-level, set-F1, one audited query = the whole pool judged) and blocks B–C (document-level, precision@cutoff) use different utilities, so J50 is never compared across blocks.", ""]
 for block, g in df.groupby("block", sort=True):
     lines += [f"## {block}", ""]
     for (c, e), gg in g.groupby(["collection", "eps"]):
-        lines += [f"**{c}, ε = {e}**", "", "| method | 판정자 | J50 (판정 쌍) | 최대 예산 (판정 쌍) | 최대 ACT | wrong |", "|---|---|---:|---:|---:|---:|"]
+        lines += [f"**{c}, ε = {e}**", "", "| method | judge | J50 (judged pairs) | largest budget (judged pairs) | max ACT | wrong |", "|---|---|---:|---:|---:|---:|"]
         for _, r in gg.sort_values(["method", "judge"]).iterrows():
             lines.append(f"| {r.method} | {r.judge} | {fmt(r.J50_docs)} | {r.max_budget_docs:,.0f} | {r.max_act:.2f} | {r.wrong_rate:.3f} |")
         lines.append("")

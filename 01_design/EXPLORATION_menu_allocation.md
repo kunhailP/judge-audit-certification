@@ -1,75 +1,75 @@
-# 탐색 (범위 제한, 상한 3–5일): 메뉴 전체를 인증하기 위한 문서 감사 배분 — 2026-09-10
+# Exploration (scoped, upper bound 3–5 days): document audit allocation for certifying the whole menu — 2026-09-10
 
-## 1. 문제 정의 (1쪽)
+## 1. Problem definition (1 page)
 
-**설정.** 정책 메뉴 M = {1..M}, 각 정책 m은 query q의 공유 pool에서 집합 R_m(q)를 반환한다(prefix 절단 또는 임계 규칙).
-utility는 분모가 라벨과 무관한 형태 u_m(q) = Σ_{d∈R_m(q)} y_d / Z_m(q) (precision@cutoff: Z_m = |R_m|).
-후보 m̂가 pilot에서 정해진 뒤, 인증은 모든 경쟁자 j ≠ m̂에 대해 UCB_j ≤ ε (Bonferroni over 순서쌍)일 때 ACT한다.
+**Setting.** Policy menu M = {1..M}; each policy m returns a set R_m(q) from the shared pool of query q (prefix truncation or threshold rule).
+The utility has a form whose denominator is independent of the labels, u_m(q) = Σ_{d∈R_m(q)} y_d / Z_m(q) (precision@cutoff: Z_m = |R_m|).
+After the candidate m̂ is determined from the pilot, certification returns ACT when UCB_j ≤ ε for every competitor j ≠ m̂ (Bonferroni over ordered pairs).
 
-**추정 대상.** 쌍 (j, m̂)의 query별 차이 D_j(q) = Σ_d w_j(d) y_d, w_j(d) = 1[d∈R_j]/Z_j − 1[d∈R_m̂]/Z_m̂ (명제 C 정정판).
-핵심 구조: **한 문서의 라벨 y_d는 w_j(d) ≠ 0인 모든 비교 j에 동시에 쓰인다.** 비교마다 가중치가 다를 뿐이다.
+**Estimand.** The per-query difference of the pair (j, m̂), D_j(q) = Σ_d w_j(d) y_d, w_j(d) = 1[d∈R_j]/Z_j − 1[d∈R_m̂]/Z_m̂ (corrected version of Proposition C).
+Key structure: **the label y_d of a single document is used simultaneously in every comparison j with w_j(d) ≠ 0.** Only the weight differs from comparison to comparison.
 
-**배분 문제.** 문서 포함확률 π(d) (query별 예산 b)을 골라, 인증 조건 max_j UCB_j ≤ ε을 가장 적은 총 라벨로 만족시킨다.
-UCB_j = μ̂_j + z·se_j, se_j² ≈ (1/n_q) Σ_q Var_π[D̂_j(q)], Var_π[D̂_j(q)] = Σ_d w_j(d)² v_d (1−π_d)/π_d (v_d = 잔차 분산;
-판정자 CV를 쓰면 v_d = E[(y_d − ĵ_d)²]). 즉 목적함수는 **max_j** 형태이고, 제약은 라벨 공유 구조를 가진다.
+**Allocation problem.** Choose the document inclusion probabilities π(d) (budget b per query) so that the certification condition max_j UCB_j ≤ ε is satisfied with the fewest total labels.
+UCB_j = μ̂_j + z·se_j, se_j² ≈ (1/n_q) Σ_q Var_π[D̂_j(q)], Var_π[D̂_j(q)] = Σ_d w_j(d)² v_d (1−π_d)/π_d (v_d = residual variance;
+with the judge CV, v_d = E[(y_d − ĵ_d)²]). That is, the objective has a **max_j** form, and the constraint has a label-sharing structure.
 
-**기존 방법을 그대로 대입하면?**
-- (a) 쌍별 Active Inference를 독립 적용: 비교마다 π_j ∝ |w_j|√v. 라벨 공유를 살리려면 합집합 규칙 π ∝ Σ_j |w_j|√v 또는
-  max_j |w_j|√v로 표집하면 된다(정적, 모든 비교를 동등 취급). → **정적 합산 가중 표집**. 이것이 강한 기준선이다.
-- (b) ε-best-arm identification(LUCB류, ε-best-answer identification 포함): 라운드마다 "결정을 가르는" 비교(UCB가 ε에
-  가장 가까운 쌍)에 표본을 집중. 다만 표본 단위가 arm pull(= query 전체 판정)이고, 문서 라벨이 여러 arm에 공유되는
-  구조는 모델링하지 않는다.
-- (c) 다중 과제 PPI(여러 추정 대상이 예측기를 공유): 대상 간 공유는 예측기 수준이며, 라벨의 가중치 공유 구조는 없다.
+**What if existing methods are plugged in as they are?**
+- (a) Applying pairwise Active Inference independently: π_j ∝ |w_j|√v per comparison. To exploit label sharing, one samples with the union rule π ∝ Σ_j |w_j|√v or
+  max_j |w_j|√v (static, treating all comparisons equally). → **static summed weighted sampling**. This is the strong baseline.
+- (b) ε-best-arm identification (LUCB family, including ε-best-answer identification): in each round, samples are concentrated on the comparison that "decides the outcome" (the pair whose UCB is
+  closest to ε). However, the sampling unit is an arm pull (= judging an entire query), and the structure in which a document label is shared across several arms
+  is not modeled.
+- (c) Multi-task PPI (several estimands share a predictor): the sharing across estimands is at the predictor level; there is no weight-sharing structure of the labels.
 
-**남는 문제(가설).** 목적이 max_j이므로 최적 π는 **모든 비교를 동등 취급하지 않고, 결정을 가르는(binding) 비교의 가중치를
-크게** 둔 λ-혼합 π ∝ Σ_j λ_j |w_j| √v 이며, λ는 현재 UCB slack에서 적응적으로 갱신된다. 이것은 (b)의 적응성을 (a)의
-문서 단위 공유 구조 위에 올린 것이다. **새로움이 있으려면 이 적응 배분이, 라벨 공유를 똑같이 허용한 정적 합산 배분보다
-같은 총 라벨에서 더 일찍 인증해야 한다.** 이득이 나는 구조적 조건: 메뉴에 (i) 이미 크게 지는 정책이 있고(그 비교는
-표본이 필요 없음), (ii) 근소 비교의 가중치가 큰 문서와 지는 비교의 가중치가 큰 문서가 **다를** 때. 두 집합이 같으면
-정적 합산과 차이가 없다.
+**Remaining problem (hypothesis).** Because the objective is max_j, the optimal π is the λ-mixture π ∝ Σ_j λ_j |w_j| √v that **does not treat all comparisons equally but gives larger weight to the
+binding comparisons that decide the outcome**, where λ is updated adaptively from the current UCB slack. This puts the adaptivity of (b) on top of the
+document-level sharing structure of (a). **For there to be novelty, this adaptive allocation must certify earlier, at the same total number of labels, than a static summed allocation that
+allows label sharing in the same way.** Structural conditions under which a gain arises: the menu contains (i) policies that already lose by a wide margin (those comparisons need
+no samples), and (ii) the documents with large weight in the close comparisons and the documents with large weight in the losing comparisons are **different**. If the two sets coincide,
+there is no difference from the static sum.
 
-**대조해야 할 선행연구.** ε-best-answer identification(Jourdan et al. 2022), 다중 과제 PPI(2026), correlated/structured
-best-arm identification, top-two Thompson sampling(어느 쌍을 비교할지의 적응). 본 탐색은 이들과 "표본 단위가 문서이고
-라벨이 비교 간 공유된다"는 점에서만 다르다.
+**Prior work to contrast.** ε-best-answer identification (Jourdan et al. 2022), multi-task PPI (2026), correlated/structured
+best-arm identification, top-two Thompson sampling (adaptivity in which pair to compare). This exploration differs from these only in that "the sampling unit is the document and
+the labels are shared across comparisons".
 
-## 2. 구성 예제
+## 2. Constructed example
 
-메뉴 4개, 후보 m̂ = A. 경쟁자 B는 A와 근소(μ_B − μ_A = 0.005, ε = 0.01), C·D는 크게 열세(−0.10).
-query마다 pool 30개 문서. A와 B의 불일치 구간은 rank 8–12(5개 문서), C·D는 rank 1–3만 반환(A와의 불일치 rank 4–8).
-- 정적 합산 배분: π ∝ |w_B| + |w_C| + |w_D| → 예산의 약 2/3가 rank 4–8(C·D 비교)에 간다. 그러나 C·D 비교는
-  UCB가 이미 ε 아래(−0.10 + z·se ≪ 0.01)라 표본이 거의 필요 없다.
-- 적응 배분: 1라운드 후 UCB_C, UCB_D ≪ ε이 확인되면 λ_C = λ_D → 0.1, 나머지 예산이 rank 8–12(B 비교)에 집중.
-  se_B가 √(1/3)배 → 같은 총 라벨에서 UCB_B ≤ ε 도달이 약 3배 빠르다.
-- 두 비교의 결정 문서가 겹치면(예: C·D도 rank 8–12에서만 다르면) 정적과 적응이 같다. **이득은 결정 문서 집합의
-  비겹침 정도에 비례**한다 — 이것이 새 방법이 설명해야 할 양이며 실데이터에서 측정 가능하다.
+Menu of 4, candidate m̂ = A. Competitor B is close to A (μ_B − μ_A = 0.005, ε = 0.01); C and D are far behind (−0.10).
+Each query has a pool of 30 documents. The disagreement region between A and B is rank 8–12 (5 documents); C and D return only rank 1–3 (disagreement with A at rank 4–8).
+- Static summed allocation: π ∝ |w_B| + |w_C| + |w_D| → about 2/3 of the budget goes to rank 4–8 (the C and D comparisons). But the C and D comparisons
+  already have UCB below ε (−0.10 + z·se ≪ 0.01), so they need almost no samples.
+- Adaptive allocation: once UCB_C, UCB_D ≪ ε is confirmed after round 1, λ_C = λ_D → 0.1, and the remaining budget is concentrated on rank 8–12 (the B comparison).
+  se_B shrinks by a factor of √(1/3) → at the same total number of labels, UCB_B ≤ ε is reached about 3 times faster.
+- If the decision documents of the two comparisons overlap (e.g. if C and D also differ only at rank 8–12), static and adaptive are the same. **The gain is proportional to the degree of
+  non-overlap of the decision document sets** — this is the quantity the new method must explain, and it is measurable on real data.
 
-## 3. 최소 실험 설계 (`83_menu_allocation.py`)
-- 데이터: dbpedia-entity(개발), 메뉴 4 = {glob, trunc, ad, rr_thresh}, precision@cutoff, 8B 판정자 CV, ε ∈ {0.01, 0.02}.
-- 공통: pilot 20 query(후보 선택·비용 포함), 총 문서 예산 B, R = 3 라운드, 라운드마다 새 query(문서 재사용은 라운드 내
-  비교 간에만 — 적응적 포함확률의 불편성을 단순하게 유지), 인증서는 라운드 합산 per-query 추정치의 t-UCB.
-- 비교군(모두 라벨 공유 허용): (A) 정적 합산 π ∝ Σ_j |w_j|; (B) 쌍별 분할(라운드 query를 3등분, 각 쌍 전용 π ∝ |w_j|,
-  공유 없음); (C) **적응 binding** λ_j^{(r)} ∝ 1/max(ε − UCB_j^{(r−1)}, δ)로 π ∝ Σ_j λ_j |w_j| (바닥 λ ≥ 0.1);
-  (D) oracle λ(참 격차 사용, 상한).
-- 지표: 예산별 ACT·wrong, ACT 50% 도달 총 라벨 수, 결정 문서 집합의 비겹침 지수(Jaccard).
-- 판정: (C)가 (A)보다 같은 라벨에서 유의하게 일찍 인증하고 그 차이가 비겹침 지수로 설명되면 계속, 아니면 탐색 종료.
+## 3. Minimal experimental design (`83_menu_allocation.py`)
+- Data: dbpedia-entity (development), menu 4 = {glob, trunc, ad, rr_thresh}, precision@cutoff, 8B judge CV, ε ∈ {0.01, 0.02}.
+- Common: pilot 20 queries (candidate selection and cost included), total document budget B, R = 3 rounds, new queries in each round (document reuse only across comparisons
+  within a round — keeps the unbiasedness of the adaptive inclusion probabilities simple); the certificate is the t-UCB of the per-query estimates pooled over rounds.
+- Comparison groups (all allow label sharing): (A) static sum π ∝ Σ_j |w_j|; (B) pairwise split (the round's queries divided into 3 equal parts, a dedicated π ∝ |w_j| for each pair,
+  no sharing); (C) **adaptive binding** λ_j^{(r)} ∝ 1/max(ε − UCB_j^{(r−1)}, δ) with π ∝ Σ_j λ_j |w_j| (floor λ ≥ 0.1);
+  (D) oracle λ (uses the true gaps, upper bound).
+- Metrics: ACT and wrong per budget, total number of labels to reach ACT 50%, non-overlap index (Jaccard) of the decision document sets.
+- Decision: continue if (C) certifies significantly earlier than (A) at the same number of labels and the difference is explained by the non-overlap index; otherwise the exploration ends.
 
-## 4. 결과 (2026-09-10, `05_results/menu_allocation/`, 300회, 모든 셀 wrong = 0)
+## 4. Results (2026-09-10, `05_results/menu_allocation/`, 300 repetitions, wrong = 0 in all cells)
 
-ACT ≥ 50% 도달 예산(전체 판정 query 상당), ε=0.02 / ε=0.01:
+Budget at which ACT ≥ 50% is reached (in fully judged query equivalents), ε=0.02 / ε=0.01:
 
-| collection · 판정자 | 비겹침 지수 | 정적 합산(공유) | 쌍별 분할(비공유) | **적응 binding** | oracle λ |
+| collection · judge | non-overlap index | static sum (shared) | pairwise split (unshared) | **adaptive binding** | oracle λ |
 |---|---|---|---|---|---|
 | dbpedia · 8B | 0.55 | 53.3 / 88.1 | 65.5 / >90 | 51.2 / 88.2 | 43.5 / 81.0 |
 | dbpedia · reranker | 0.55 | 65.2 / >90 | 68.0 / >90 | 63.3 / >90 | 60.9 / >90 |
 | dl212223 · 8B | 0.83 | 38.7 / 47.8 | 40.5 / 69.1 | 38.7 / 46.4 | 38.2 / 43.7 |
 
-- 라벨 공유 자체는 중요하다(쌍별 분할은 ε=0.01에서 확연히 열세). 그러나 **공유는 정적 합산 배분이 이미 다 가져간다.**
-- 적응 배분은 정적 합산과 차이가 없다(±2 query 상당, 잡음 범위). **참 격차를 아는 oracle조차** 이득이 5–18%에
-  그친다 — 즉 이 메뉴·데이터에서 적응 배분이 얻을 수 있는 상한 자체가 작다. 열세 비교의 UCB가 소수 라벨로 이미 ε 아래로
-  내려가므로 정적 합산이 낭비하는 예산이 적기 때문이다.
-- 비겹침 지수가 0.83인 dl212223에서도 oracle 이득은 ε=0.01에서 9%에 불과하다. 구성 예제(§2)의 3배 이득 구조는
-  실데이터에서 나타나지 않았다.
+- Label sharing itself matters (the pairwise split is clearly inferior at ε=0.01). However, **the static summed allocation already captures all of the sharing.**
+- The adaptive allocation shows no difference from the static sum (±2 query equivalents, within the noise range). **Even the oracle that knows the true gaps** gains only 5–18%
+  — that is, on this menu and data, the upper bound on what adaptive allocation can gain is itself small. This is because the UCB of the losing comparisons already drops below ε
+  with a small number of labels, so the static sum wastes little budget.
+- Even on dl212223, whose non-overlap index is 0.83, the oracle gain is only 9% at ε=0.01. The 3-fold gain structure of the constructed example (§2)
+  did not appear on real data.
 
-**판정: 사전 기준("적응이 정적 합산보다 유의하게 일찍 인증") 미충족 → 탐색 종료.** 이 방향은 논문의 핵심 기여가 되지
-못한다. 부록에 "정적 라벨 공유 배분으로 충분하며 적응 배분의 상한이 작다"는 부정 결과로 남긴다.
-소요: 코드·실행 약 2시간(상한 3–5일 안).
+**Decision: the pre-specified criterion ("adaptive certifies significantly earlier than the static sum") is not met → exploration ends.** This direction cannot become
+a core contribution of the paper. It is kept in the appendix as a negative result: "static label-sharing allocation suffices, and the upper bound of adaptive allocation is small".
+Time spent: about 2 hours of coding and running (within the 3–5 day upper bound).

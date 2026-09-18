@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Build an anonymous supplementary zip for OpenReview: the tracked tree without .git and without the release-only record sets.
+# Build an anonymous supplementary zip for OpenReview: the tracked tree without .git, without the release-only record sets
+# and without the submission-form notes.
 # Usage: SUPP_IDENT_REGEX='account|e-mail|surname' 06_paper/make_supplementary.sh [out.zip]   (the regex is deliberately not stored here)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=${1:-/root/judge-audit-supplementary.zip}; rm -f "$OUT"
-git ls-files | grep -v "_draws.csv$\|_predict.csv$" | grep -v "^06_paper/SUBMISSION_CHECKLIST.md$\|^06_paper/ANONYMOUS_MIRROR.md$\|^06_paper/reviews/" > /tmp/supp_files.txt
+git ls-files | grep -v "_draws.csv$\|_predict.csv$" | grep -v "^06_paper/OPENREVIEW_FORM.md$" > /tmp/supp_files.txt
 python3 - "$OUT" <<'PY'
 import sys, zipfile, re
 out=sys.argv[1]; files=[l.strip() for l in open('/tmp/supp_files.txt') if l.strip()]

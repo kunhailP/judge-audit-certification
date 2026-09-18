@@ -1,170 +1,181 @@
-# 2027 논문 설계 v0.1 — Auditing Deployment Decisions Under Non-Neutral AI Judges
+# 2027 Paper Design v0.1 — Auditing Deployment Decisions Under Non-Neutral AI Judges
 
-상태: **설계 초안 (2026-09-10), 프로토타입 시뮬레이션 1건 첨부**
-목적: 현재 planner를 "인간 감사 + 편향 가능한 AI 판정자" 시대의 배포 인증 문제로
-재정의하여, 2027년 기준 선제적인 TMLR 논문으로 만든다.
+Status: **design draft (2026-09-10), one prototype simulation attached**
+Purpose: reframe the current planner as a deployment-certification problem for the era of
+"human audit + possibly biased AI judge", and turn it into a TMLR paper that is ahead of its
+time by 2027 standards.
 
-## 0. 한 문장 명제
+## 0. One-sentence thesis
 
-> AI 판정자가 후보 정책에 대해 중립적이지 않을 때, 배포 결정을 안전하게 인증하는 데
-> 필요한 인간 감사량은 판정자의 전체 정확도가 아니라 **결정 관련 구간에서의 정책 상관
-> 오류**로 결정된다. 우리는 이를 측정·통제하는 순차 감사 planner를 제안한다.
+> When an AI judge is not neutral with respect to the candidate policies, the amount of human
+> auditing required to safely certify a deployment decision is determined not by the judge's
+> overall accuracy but by its **policy-correlated error in the decision-relevant region**. We
+> propose a sequential audit planner that measures and controls this quantity.
 
-기존 초안의 "recalibration vs selection" 비교는 보조 결과로 내리고, 위 명제를 중심에 둔다.
+The "recalibration vs selection" comparison from the earlier draft is demoted to a secondary result; the thesis above is placed at the center.
 
-## 1. 왜 2027년에 선제적인가
+## 1. Why this is ahead of its time in 2027
 
-- 2024–2026 PPI 계열(Oosterhuis KDD'24, Chatzi NeurIPS'24, Gligorić–Zrnic–Candès'24,
-  Kilian NeurIPS'25, Sfyraki–Wang ICLR'26)은 판정자를 **고정된 예측기**로 두고
-  편향을 rectifier로 보정한다. 판정자 오류가 *어느 후보를 평가하느냐에 따라 달라지는*
-  경우의 비용·위험은 다루지 않는다.
-- IR 평가 문헌(Balog et al. 2025 "Rankers, Judges, and Assistants")은 LLM judge가
-  LLM 기반 ranker를 체계적으로 선호함을 실증했다. 2027년의 검색·RAG 파이프라인은
-  후보(reranker, LLM cutoff)와 판정자가 같은 모델군에서 나온다. 즉 **비중립 판정자가
-  기본값**이 된다.
-- 이 저장소만의 구조: 후보 정책이 같은 순위 pool을 공유하고 절단 위치만 다르다.
-  따라서 결정에 영향을 주는 판정은 두 절단점 사이의 **불일치 구간**에 국소화된다.
-  비중립성이 정확히 이 구간에 집중될 때 무슨 일이 생기는지 형식화할 수 있다.
+- The 2024–2026 PPI family (Oosterhuis KDD'24, Chatzi NeurIPS'24, Gligorić–Zrnic–Candès'24,
+  Kilian NeurIPS'25, Sfyraki–Wang ICLR'26) treats the judge as a **fixed predictor** and
+  corrects its bias with a rectifier. It does not address the cost and risk when the judge's
+  error *depends on which candidate is being evaluated*.
+- The IR evaluation literature (Balog et al. 2025 "Rankers, Judges, and Assistants") showed
+  empirically that LLM judges systematically favor LLM-based rankers. In 2027 search and RAG
+  pipelines, the candidates (reranker, LLM cutoff) and the judge come from the same model
+  family. That is, **a non-neutral judge becomes the default**.
+- The structure unique to this repository: candidate policies share the same ranked pool and
+  differ only in the cutoff position. Hence the judgments that affect the decision are localized
+  to the **disagreement region** between the two cutoffs. We can formalize what happens when
+  non-neutrality is concentrated exactly in this region.
 
-## 2. 문제 설정
+## 2. Problem setting
 
-- 목표 분포 `P_T`의 query `q`, 공유 pool의 문서 순위, 정책 `m ∈ M`은 절단 `k_m(q)`.
-- 참 관련성 `r(q,d)`, 참 utility `u_m(q)`, AI 판정 `r̂(q,d)`, 예측 utility `û_m(q)`.
-- 인간 감사: query 단위 완전 판정(현재) 또는 pair 단위(확장).
-- 결정: `m̂` 선택 후 `L = max_j μ_j − μ_m̂ ≤ ε` 인증 / MORE / ABSTAIN.
-- 위험: `P(ACT ∧ L > ε) ≤ α` (모든 look에서, anytime-valid).
+- Query `q` from the target distribution `P_T`, a document ranking over the shared pool, and policy `m ∈ M` with cutoff `k_m(q)`.
+- True relevance `r(q,d)`, true utility `u_m(q)`, AI judgment `r̂(q,d)`, predicted utility `û_m(q)`.
+- Human audit: full judgment at the query level (current) or at the pair level (extension).
+- Decision: after selecting `m̂`, certify `L = max_j μ_j − μ_m̂ ≤ ε` / MORE / ABSTAIN.
+- Risk: `P(ACT ∧ L > ε) ≤ α` (at every look, anytime-valid).
 
-### 판정자 비중립성의 정의
+### Definition of judge non-neutrality
 
-정책 쌍 `(j, m)`에 대해 paired 예측 오차 `η_{jm}(q) = (u_j − u_m)(q) − (û_j − û_m)(q)`.
+For a policy pair `(j, m)`, the paired prediction error is `η_{jm}(q) = (u_j − u_m)(q) − (û_j − û_m)(q)`.
 
-- **중립**: `η_{jm}`가 불일치 구간 `Δ_{jm}(q) = R_j(q) △ R_m(q)`의 소속과 독립.
-- **비중립(정책 상관)**: `E[η_{jm} | d ∈ Δ_{jm}] ≠ 0` 또는 그 분산이 구간에 집중.
+- **Neutral**: `η_{jm}` is independent of membership in the disagreement region `Δ_{jm}(q) = R_j(q) △ R_m(q)`.
+- **Non-neutral (policy-correlated)**: `E[η_{jm} | d ∈ Δ_{jm}] ≠ 0`, or its variance is concentrated in the region.
 
-핵심 양: **결정 관련 일치도** `ρ_{jm} = corr(u_j − u_m, û_j − û_m)`.
-PPI++ paired 인증서의 유효표본 이득은 `1/(1 − ρ_{jm}²)`이며, 전체 판정 정확도와는
-분리된다. (프로토타입: 정확도 0.95→0.94에서 ρ 0.82→0.52.)
+Key quantity: **decision-relevant agreement** `ρ_{jm} = corr(u_j − u_m, û_j − û_m)`.
+The effective-sample-size gain of the PPI++ paired certificate is `1/(1 − ρ_{jm}²)`, and it is
+decoupled from overall judge accuracy. (Prototype: accuracy 0.95→0.94 while ρ 0.82→0.52.)
 
-## 3. 방법: 세 층의 인증서
+## 3. Method: three layers of certificates
 
-1. **Paired PPI++ 선택 인증서.** 현재 bootstrap한 `T×M` utility 행렬을
-   paired difference의 PPI++ 추정(λ 조정)으로 교체. 판정자 편향은 rectifier가
-   보정하므로 유효성은 유지되고, 비용은 `ρ`로 결정된다. anytime-valid 버전은
-   Kilian et al.의 confidence sequence를 paired 차이에 적용.
-2. **판정자 중립성 진단(neutrality audit).** 소량 인간 감사로 `η_{jm}`의
-   구간 조건부 평균·분산을 추정하고, `ρ̂_{jm}`의 하한을 계산한다. 이 값이 낮으면
-   planner는 "이 판정자로는 인간 단독보다 싸게 인증할 수 없다"고 **사전에** 알린다.
-   판정자 채택 여부 자체가 인증 대상이 된다.
-3. **구간 국소 감사(pair-level).** 인간 판정을 query 전체가 아니라 불일치 구간의
-   문서에 배분. utility가 구간만으로 결정되는 경우(precision 계열, 고정 `nG`
-   가정하의 recall)에는 pair 비용이 정확히 계산되고, set-F1처럼 `nG`가 필요한
-   경우에는 `nG`의 PPI 보정 비용이 추가된다. 이 차이 자체가 결과다(기존 "recall에서
-   난이도 역전" 관찰과 연결).
+1. **Paired PPI++ selection certificate.** Replace the currently bootstrapped `T×M` utility
+   matrix with the PPI++ estimate of paired differences (with λ tuning). Since the rectifier
+   corrects judge bias, validity is preserved, and the cost is determined by `ρ`. The
+   anytime-valid version applies the confidence sequence of Kilian et al. to the paired differences.
+2. **Judge neutrality diagnostic (neutrality audit).** From a small human audit, estimate the
+   region-conditional mean and variance of `η_{jm}` and compute a lower bound on `ρ̂_{jm}`. If this
+   value is low, the planner reports **in advance** that "with this judge, certification cannot be
+   cheaper than human-only". Whether to adopt the judge at all becomes itself a certified decision.
+3. **Region-local audit (pair-level).** Allocate human judgments not to entire queries but to the
+   documents in the disagreement region. When utility is determined by the region alone (the
+   precision family, and recall under a fixed `nG` assumption), the pair cost is computed exactly;
+   when `nG` is required, as with set-F1, the PPI correction cost for `nG` is added. This
+   difference is itself a result (connects to the earlier "difficulty reversal in recall" observation).
 
-## 4. 정리 후보
+## 4. Candidate theorems
 
-- **정리 A (비용 분리).** 중립 판정자 하에서 paired PPI 인증서의 기대 정지 시점은
-  `ρ_{jm}`와 격차 `μ_j − μ_m`만의 함수이며, 전체 정확도 `acc`는 `ρ`를 통해서만
-  들어간다. 비중립 판정자에서는 같은 `acc`로 `ρ`가 임의로 낮아질 수 있다(구성적 반례).
-- **정리 B (유효성 보존).** rectifier가 인간 감사에서 추정되는 한, 비중립성은
-  `P(ACT ∧ L>ε)`를 높이지 않는다. 반면 rectifier 없는 판정자 단독 결정은
-  편향 방향이 격차와 반대일 때 확률 1로 잘못 인증한다(프로토타입에서 관측).
-- **정리 C (국소화).** utility가 구간 가법적이면 pair 단위 감사로 query 단위 감사와
-  같은 인증서를 `|Δ_{jm}|/|pool|` 비율의 판정 비용으로 얻는다.
+- **Theorem A (cost separation).** Under a neutral judge, the expected stopping time of the paired
+  PPI certificate is a function only of `ρ_{jm}` and the gap `μ_j − μ_m`; overall accuracy `acc`
+  enters only through `ρ`. Under a non-neutral judge, `ρ` can be made arbitrarily low at the same
+  `acc` (constructive counterexample).
+- **Theorem B (validity preservation).** As long as the rectifier is estimated from the human audit,
+  non-neutrality does not increase `P(ACT ∧ L>ε)`. In contrast, a judge-only decision without a
+  rectifier certifies wrongly with probability 1 when the bias direction is opposite to the gap
+  (observed in the prototype).
+- **Theorem C (localization).** If utility is additive over the region, pair-level auditing yields the
+  same certificate as query-level auditing at a judgment cost of the ratio `|Δ_{jm}|/|pool|`.
 
-## 5. 프로토타입 결과 (04_code/proto/80_judge_bias_sim.py, 2026-09-10)
+## 5. Prototype results (04_code/proto/80_judge_bias_sim.py, 2026-09-10)
 
-정책 A=고정 cutoff 8, B=F1-최적 cutoff와 잡음 cutoff의 혼합. 판정자는 무작위
-오류율 `e`에 더해 "B만 가져오는 문서"를 확률 `bias`로 관련으로 오판(정책 상관 편향).
-α=0.1, ε=0.01, look {10,…,250}, 200회.
+Policy A = fixed cutoff 8, B = a mixture of the F1-optimal cutoff and a noisy cutoff. On top of a
+random error rate `e`, the judge misjudges "documents retrieved only by B" as relevant with
+probability `bias` (policy-correlated bias).
+α=0.1, ε=0.01, looks {10,…,250}, 200 replications.
 
-### 격차 +0.011 (B가 근소하게 우세, ε 경계)
+### Gap +0.011 (B marginally better, at the ε boundary)
 
-| e | bias | 전체 정확도 | ρ | 인간 단독 T | PPI T | PPI 잘못된 인증 |
+| e | bias | overall accuracy | ρ | human-only T | PPI T | PPI wrong certificate |
 |---|---|---|---|---|---|---|
 | 0.05 | 0.0 | 0.950 | 0.82 | 144 | **53** | 0.09 |
 | 0.05 | 0.3 | 0.938 | 0.52 | 146 | 106 | 0.06 |
 | 0.05 | 0.6 | 0.925 | 0.28 | 141 | 123 | 0.08 |
 | 0.15 | 0.0 | 0.850 | 0.43 | 131 | 108 | 0.10 |
 
-전체 정확도가 1–2.5점 떨어지는 정책 상관 편향만으로 PPI 절감(63%)이 거의 사라진다.
+A policy-correlated bias that lowers overall accuracy by only 1–2.5 points almost entirely erases the PPI savings (63%).
 
-### 격차 −0.017 (A가 우세, 판정자는 B 편애)
+### Gap −0.017 (A better, judge favors B)
 
-| e | bias | 판정자 단독 잘못된 인증 | 인간 단독 | PPI |
+| e | bias | judge-only wrong certificate | human-only | PPI |
 |---|---|---|---|---|
 | 0.05 | 0.0 | 0.00 | 0.04 (T 89) | 0.03 (T 30) |
 | 0.05 | 0.3 | **1.00** | 0.03 (T 81) | 0.06 (T 71) |
 | 0.15 | 0.3 | **1.00** | 0.03 (T 90) | 0.05 (T 81) |
 
-판정자 단독은 정확도 0.94에서도 100% 잘못 배포한다. rectifier가 있는 두 방법은
-α 이내를 유지한다. (T=10 look의 정규근사 때문에 일부 셀이 0.10–0.125로 경계에
-걸린다 — 본 실험에서는 t-분포 또는 confidence sequence로 교체.)
+The judge-only method deploys wrongly 100% of the time even at accuracy 0.94. Both methods with
+a rectifier stay within α. (Because of the normal approximation at the T=10 look, some cells sit
+at the boundary at 0.10–0.125 — in the main experiment, replace with a t-distribution or a
+confidence sequence.)
 
-## 6. 실험 프로그램
+## 6. Experimental program
 
-1. **검색 스택 현대화 (필수 선행).** Qwen3-Embedding 0.6B(+4B Pod) 및 reranker로
-   후보 pool 재구성. 기존 pool 유지. 13개 + android에서 격차 구조 재측정.
-   결과가 어느 쪽이든 보고.
-2. **판정자 오류 측정 testbed.** BEIR sparse qrels는 판정자 "오류"와 qrels 구멍을
-   구분 못 한다. 깊게 판정된 TREC DL 2019–2021(+ LLMJudge/TREC RAG 2024의 인간·합성
-   qrels 병행 자료)을 primary로. LLM judge 2–3종(서로 다른 모델군) 준비.
-3. **비중립성 실측.** reranker 정책이 메뉴에 있을 때 judge의 `η` 구간 조건부 편향을
-   실측. 같은 모델군 judge vs 다른 모델군 judge 비교.
-4. **인증서 비교.** 인간 단독(현 planner, 결함 수정본) / paired PPI++ / anytime PPI /
-   Oosterhuis PPI·CRC 고정예산 / Chatzi rank-set / confidence-driven sampling /
-   SELECT-LLM 휴리스틱. 지표: 잘못된 인증률, ACT율, 인간 query 수, pair 수, 판정자
-   추론비용.
-5. **국소 감사.** utility 3종(precision@cut, recall, set-F1)에서 pair 국소화의
-   비용·유효성. 정리 C의 조건이 실제로 갈리는지.
-6. **Prospective lock.** 새 collection 1개 + 새 judge 1개를 잠그고 단일 primary run.
+1. **Modernize the retrieval stack (mandatory prerequisite).** Rebuild the candidate pool with
+   Qwen3-Embedding 0.6B (+4B Pod) and a reranker. Keep the existing pool. Re-measure the gap
+   structure on the 13 collections + android. Report the result whichever way it goes.
+2. **Judge-error measurement testbed.** BEIR sparse qrels cannot distinguish judge "errors" from
+   qrels holes. Use deeply judged TREC DL 2019–2021 (+ the parallel human/synthetic qrels of
+   LLMJudge / TREC RAG 2024) as primary. Prepare 2–3 LLM judges (from different model families).
+3. **Measuring non-neutrality.** Measure the judge's region-conditional bias of `η` when a reranker
+   policy is on the menu. Compare a judge from the same model family vs a judge from a different model family.
+4. **Certificate comparison.** Human-only (current planner, defect-corrected version) / paired PPI++ /
+   anytime PPI / Oosterhuis PPI·CRC fixed-budget / Chatzi rank-set / confidence-driven sampling /
+   SELECT-LLM heuristic. Metrics: wrong-certificate rate, ACT rate, number of human queries, number
+   of pairs, judge inference cost.
+5. **Local audit.** Cost and validity of pair localization under 3 utilities (precision@cut, recall,
+   set-F1). Whether the conditions of Theorem C actually separate in practice.
+6. **Prospective lock.** Lock 1 new collection + 1 new judge and run a single primary run.
 
-## 7. Kill / downgrade 기준
+## 7. Kill / downgrade criteria
 
-- 현대 pool에서 정책 간 격차가 모두 `≫ ε`이면(선택이 자명) 메뉴를 reranker 변형으로
-  확장하되, 그래도 자명하면 "선택 인증은 현대 검색에서 불필요"를 결과로 보고.
-- 실측 `ρ`가 judge 모델군과 무관하게 높으면 비중립성 명제를 축소하고 PPI 적용
-  논문으로 내린다.
-- 국소 감사가 어떤 utility에서도 비용을 줄이지 못하면 정리 C를 삭제.
+- If all gaps between policies on the modern pool are `≫ ε` (selection is trivial), extend the
+  menu with reranker variants; if it is still trivial, report "selection certification is
+  unnecessary in modern retrieval" as the result.
+- If the measured `ρ` is high regardless of the judge model family, scale down the non-neutrality
+  thesis and demote the paper to a PPI application paper.
+- If the local audit reduces cost under no utility, delete Theorem C.
 
-## 8. 기존 결함 수정(선행 조건, 변경 없음)
+## 8. Fixing existing defects (prerequisite, unchanged)
 
-40_planner_replay.py 보정 인증서의 끝점 검사, LOO bootstrap의 유효성, 50_simulation.py의
-look별 재표집, 70_prospective_run.py의 구간 보고. 판정자를 도입해도 그대로 남는다.
+The endpoint check in the 40_planner_replay.py recalibration certificate, the validity of the LOO
+bootstrap, the per-look resampling in 50_simulation.py, and the interval reporting in
+70_prospective_run.py. These remain as they are even after the judge is introduced.
 
-## 9. 착수 기록 (2026-09-10, branch `2027-nonneutral-judge`)
+## 9. Kickoff record (2026-09-10, branch `2027-nonneutral-judge`)
 
-### 9.1 확인된 사실 (합성 자료, `04_code/lib/certificates.py` self-test)
+### 9.1 Confirmed facts (synthetic data, `04_code/lib/certificates.py` self-test)
 
-- **끝점 검사 결함 재현**: 단일 query 예에서 끝점 spread 0.000, breakpoint 전수 검사 spread 0.167.
-  v0.4 보정 인증서는 구간 안의 모든 gate breakpoint를 검사한다(`recal_spread`).
-- **후보 선택의 winner's curse**: 후보를 같은 자료에서 고르고 M−1개 비교만 보정하면
-  정확한 t-구간을 써도 look당 위험이 0.049 (예산 0.020). 모든 순서쌍 M(M−1)을 동시
-  보정하면 0.014. v0.3의 Proposition 1은 "후보가 고정"일 때만 성립했다.
-- PPI++ paired UCB도 같은 동시 보정 아래 0.006으로 유효.
+- **Endpoint-check defect reproduced**: in a single-query example, the endpoint spread is 0.000 while
+  the exhaustive breakpoint check gives spread 0.167.
+  The v0.4 recalibration certificate checks every gate breakpoint inside the interval (`recal_spread`).
+- **Winner's curse in candidate selection**: if the candidate is chosen on the same data and only the
+  M−1 comparisons are corrected, the per-look risk is 0.049 (budget 0.020) even with an exact
+  t-interval. Correcting all ordered pairs M(M−1) simultaneously gives 0.014. Proposition 1 of v0.3
+  held only when "the candidate is fixed".
+- The PPI++ paired UCB is also valid at 0.006 under the same simultaneous correction.
 
-### 9.2 P4 prospective 결과의 구간 (`71_prospective_report.py`, 재실행 없음)
+### 9.2 Intervals for the P4 prospective result (`71_prospective_report.py`, no re-run)
 
 | decision | ACT | wrong | wrong rate [CP 95%] | wrong given ACT [CP 95%] |
 |---|---|---|---|---|
 | recalibration | 22/50 | 0 | 0.00 [0.000, 0.071] | 0.00 [0.000, 0.154] |
 | selection | 40/50 | 4 | 0.08 [0.022, 0.192] | 0.10 [0.028, 0.237] |
 
-### 9.3 진행 중인 실험 (이 환경: RTX 3090, 256 CPU)
+### 9.3 Experiments in progress (this environment: RTX 3090, 256 CPUs)
 
-- `61_build_pool.py`: nfcorpus / scifact / arguana / cqadupstack-android에 대해 legacy·modern
-  두 stack의 후보 pool + Qwen3-Reranker P(yes) judge proxy.
-- `62_pool_compare.py`: go/no-go #1 — 현대 stack에서 격차 구조 생존 여부.
-- `63_planner_v2.py`: loo_boot(v0.3) / split_t / split_ppi 인증서 비교 + judge 진단
-  (전체 정확도, ρ, 불일치 구간 안팎 오류율).
-- `64_trecdl_pool.py`: TREC DL 2019/2020 완전 판정 pool (go/no-go #2 testbed).
+- `61_build_pool.py`: candidate pools for both the legacy and modern stacks on nfcorpus / scifact /
+  arguana / cqadupstack-android + Qwen3-Reranker P(yes) judge proxy.
+- `62_pool_compare.py`: go/no-go #1 — whether the gap structure survives on the modern stack.
+- `63_planner_v2.py`: comparison of loo_boot(v0.3) / split_t / split_ppi certificates + judge diagnostics
+  (overall accuracy, ρ, error rates inside and outside the disagreement region).
+- `64_trecdl_pool.py`: fully judged TREC DL 2019/2020 pool (go/no-go #2 testbed).
 
-### 9.4 Go/no-go #1 결과 — 현대 stack에서 결정 구조 생존 (`05_results/pool_compare/`)
+### 9.4 Go/no-go #1 result — decision structure survives on the modern stack (`05_results/pool_compare/`)
 
-LODO(3개로 학습, 1개 평가), 50회 반복, set-F1, ε_cal=0.005, ε_sel=0.01.
-modern = legacy에서 msmarco-MiniLM을 Qwen3-Embedding-0.6B로 교체(4-feature 분류기는 동일).
+LODO (train on 3, evaluate on 1), 50 replications, set-F1, ε_cal=0.005, ε_sel=0.01.
+modern = legacy with msmarco-MiniLM replaced by Qwen3-Embedding-0.6B (the 4-feature classifier is unchanged).
 
-| collection | stack | pool recall | best F1 | best policy | 1–2위 격차 | cal ok@10 | sel ok@10 | sel ok@50 |
+| collection | stack | pool recall | best F1 | best policy | gap 1st–2nd | cal ok@10 | sel ok@10 | sel ok@50 |
 |---|---|---|---|---|---|---|---|---|
 | android | legacy | 0.852 | 0.315 | ad_probe | 0.008 | 0.52 | 0.88 | 0.94 |
 | android | modern | 0.865 | 0.356 | glob_probe | 0.023 | 0.26 | 0.86 | 0.84 |
@@ -175,20 +186,21 @@ modern = legacy에서 msmarco-MiniLM을 Qwen3-Embedding-0.6B로 교체(4-feature
 | arguana | legacy | 0.986 | 0.163 | glob_probe | 0.041 | 0.30 | 0.90 | 1.00 |
 | arguana | modern | 0.992 | 0.166 | glob_probe | 0.043 | 0.30 | 0.84 | 1.00 |
 
-판정: **GO.** 검색 성능은 오르지만(android F1 0.315→0.356) 정책 간 격차는 여전히 ε 규모
-(0.003–0.043)이고, android에서는 최적 정책 자체가 ad_probe→glob_probe로 바뀐다.
-즉 강한 검색기에서도 "어떤 절단 규칙을 배포할지"는 감사가 필요한 결정으로 남는다.
-보정 결정은 modern에서 오히려 어려워지는 경향(android cal ok@10 0.52→0.26).
-한계: 4-feature 분류기가 그대로라 Qwen3 신호는 pool 구성에만 들어갔다. qwen3e_cos를
-feature로 넣은 "fully modern" 변형은 후속.
+Verdict: **GO.** Retrieval performance rises (android F1 0.315→0.356), but the gaps between policies
+remain on the scale of ε (0.003–0.043), and on android the optimal policy itself changes from
+ad_probe to glob_probe. That is, even with a strong retriever, "which cutoff rule to deploy" remains
+a decision that requires auditing.
+The recalibration decision tends to become harder on modern (android cal ok@10 0.52→0.26).
+Limitation: since the 4-feature classifier is unchanged, the Qwen3 signal entered only the pool
+construction. A "fully modern" variant with qwen3e_cos as a feature is follow-up work.
 
-### 9.5 Planner v2 결과 — 인증서 변형 비교 (`05_results/planner_v2/`, 50회, α=0.1)
+### 9.5 Planner v2 results — comparison of certificate variants (`05_results/planner_v2/`, 50 replications, α=0.1)
 
-방법: `loo_boot`(v0.3 그대로), `loo_sim`(LOO + 모든 순서쌍 동시보정), `split_t`(학습/검증 분리 + t),
-`split_ppi`(split_t + Qwen3-Reranker judge PPI++), 보정은 `recal_ep`(v0.3 끝점), `recal_bp`(breakpoint 전수),
-`recal_bpx`(breakpoint + 정확 median 구간), `recal_bpxu`(+ uniform bootstrap 상한).
+Methods: `loo_boot` (v0.3 as is), `loo_sim` (LOO + simultaneous correction over all ordered pairs), `split_t` (train/validation split + t),
+`split_ppi` (split_t + Qwen3-Reranker judge PPI++); recalibration: `recal_ep` (v0.3 endpoints), `recal_bp` (exhaustive breakpoints),
+`recal_bpx` (breakpoints + exact median interval), `recal_bpxu` (+ uniform bootstrap upper bound).
 
-**선택 결정 (ACT율 / 잘못된 인증률)**
+**Selection decision (ACT rate / wrong-certificate rate)**
 
 | stack | collection | loo_boot | loo_sim | split_t | split_ppi |
 |---|---|---|---|---|---|
@@ -201,13 +213,13 @@ feature로 넣은 "fully modern" 변형은 후속.
 | modern | nfcorpus | 0.88 / 0.04 | 0.72 / 0.02 | 0.26 / 0.02 | 0.30 / 0.02 |
 | modern | arguana | 0.88 / 0.04 | 0.82 / 0.04 | 0.28 / 0.00 | 0.32 / 0.00 |
 
-- v0.3 인증서(`loo_boot`)는 modern stack의 두 collection에서 α를 넘는다(0.12, MC SE 0.04).
-  동시보정(`loo_sim`)이 이를 낮추지만 LOO 의존성은 남는다.
-- 유효한 split 인증서는 ACT율이 0.10–0.38로 떨어진다. **v0.3의 효율 일부는 유효성 위반에서 온 것.**
-  이것이 "자료 재사용을 허용하면서 유효한 인증서"가 필요한 실증적 이유다.
-- PPI의 이득은 미미하다. 판정자(reranker≥0.5)의 paired-difference ρ가 0.04–0.27에 불과.
+- The v0.3 certificate (`loo_boot`) exceeds α on two collections of the modern stack (0.12, MC SE 0.04).
+  Simultaneous correction (`loo_sim`) lowers this, but the LOO dependence remains.
+- The valid split certificates drop the ACT rate to 0.10–0.38. **Part of v0.3's efficiency came from validity violation.**
+  This is the empirical reason a "valid certificate that permits data reuse" is needed.
+- The gain from PPI is marginal. The paired-difference ρ of the judge (reranker≥0.5) is only 0.04–0.27.
 
-**보정 결정 (ACT율 / 잘못된 인증률)**
+**Recalibration decision (ACT rate / wrong-certificate rate)**
 
 | stack | collection | recal_ep (v0.3) | recal_bp | recal_bpx | recal_bpxu |
 |---|---|---|---|---|---|
@@ -216,12 +228,12 @@ feature로 넣은 "fully modern" 변형은 후속.
 | modern | arguana | 0.32 / **0.14** | 0.30 / **0.14** | 0.20 / 0.08 | 0.14 / 0.08 |
 | modern | nfcorpus | 0.80 / 0.00 | 0.48 / 0.00 | 0.44 / 0.00 | 0.00 / – |
 
-- 끝점 검사는 ACT율을 2–5배 부풀린다(android 0.30 vs 0.06). v0.3 P4의 recal ACT 0.44도 같은 이유로 과대.
-- bootstrap median 구간은 T=10에서 실패(arguana modern 오류 0.14 → 정확 구간으로 0.08).
-- 표본 utility 곡선의 불확실성까지 상한(`bpxu`)에 넣으면 ε_cal=0.005는 90건 안에서 거의 인증 불가.
-  → ε_cal 재설정 또는 보정을 보조 결과로 내리는 결정이 필요.
+- The endpoint check inflates the ACT rate by 2–5x (android 0.30 vs 0.06). The recal ACT of 0.44 in v0.3 P4 is overstated for the same reason.
+- The bootstrap median interval fails at T=10 (arguana modern error 0.14 → 0.08 with the exact interval).
+- If the uncertainty of the sample utility curve is also folded into the upper bound (`bpxu`), ε_cal=0.005 is almost never certifiable within 90 cases.
+  → A decision is needed: either reset ε_cal or demote recalibration to a secondary result.
 
-**판정자 진단 (pair 정확도 / 결정 구간 안 오류율 / 밖 오류율)**
+**Judge diagnostics (pair accuracy / error rate inside the decision region / outside)**
 
 | collection | legacy | modern |
 |---|---|---|
@@ -230,19 +242,19 @@ feature로 넣은 "fully modern" 변형은 후속.
 | android | 0.61 / 0.70 / 0.38 | 0.56 / 0.75 / 0.43 |
 | nfcorpus | 0.87 / 0.15 / 0.13 | 0.86 / 0.15 / 0.14 |
 
-**판정자 오류는 정책 불일치 구간에 2–3배 집중된다.** 이것이 §2 명제의 첫 실데이터 증거다.
-단, BEIR qrels 구멍이 "오류"에 섞여 있으므로 TREC DL 완전 판정 pool에서 재측정해야 한다(진행 중).
-android에서는 reranker 판정자가 사실상 무작위(0.56–0.61): 중복 질문 관련성은 passage 관련성과 다른 과제.
+**Judge errors are concentrated 2–3x in the policy disagreement region.** This is the first real-data evidence for the §2 thesis.
+However, since BEIR qrels holes are mixed into the "errors", this must be re-measured on the fully judged TREC DL pool (in progress).
+On android the reranker judge is effectively random (0.56–0.61): duplicate-question relevance is a different task from passage relevance.
 
-주의: 방법 변형을 추가하면 rng 소비 순서가 바뀌어 `loo_boot` 수치가 run 간 ±0.04 흔들린다.
-최종 실험에서는 방법별 독립 rng stream을 써야 한다.
+Caution: adding method variants changes the rng consumption order, so the `loo_boot` numbers fluctuate by ±0.04 between runs.
+The final experiment must use an independent rng stream per method.
 
-### 9.6 Go/no-go #2 — TREC DL 완전 판정 pool에서의 판정자 진단 (`05_results/planner_v2/trecdl`, `05_results/ppi_gain`)
+### 9.6 Go/no-go #2 — judge diagnostics on the fully judged TREC DL pool (`05_results/planner_v2/trecdl`, `05_results/ppi_gain`)
 
-pool = NIST 판정 passage 전체(dl2019 43 query·9,260 pair, dl2020 54 query·11,386 pair), relevant = grade≥2,
-판정자 = Qwen3-Reranker-0.6B P(yes)≥0.5 (pair 정확도 0.70 / 0.66). 정책 파라미터는 다른 해에서 학습(LODO).
+pool = all NIST-judged passages (dl2019 43 queries · 9,260 pairs, dl2020 54 queries · 11,386 pairs), relevant = grade≥2,
+judge = Qwen3-Reranker-0.6B P(yes)≥0.5 (pair accuracy 0.70 / 0.66). Policy parameters are trained on the other year (LODO).
 
-| collection | 정책 쌍 | ρ | 구간 안 오류 | 구간 밖 오류 | ESS 이득 (T=10) | 이론 1/(1−ρ²) |
+| collection | policy pair | ρ | error inside region | error outside region | ESS gain (T=10) | theory 1/(1−ρ²) |
 |---|---|---|---|---|---|---|
 | dl2019 | glob vs trunc | 0.70 | 0.33 | 0.29 | 1.76 | 1.94 |
 | dl2019 | glob vs ad | 0.44 | 0.32 | 0.30 | 1.31 | 1.23 |
@@ -251,36 +263,36 @@ pool = NIST 판정 passage 전체(dl2019 43 query·9,260 pair, dl2020 54 query·
 | dl2020 | glob vs ad | **0.01** | **0.62** | 0.27 | **1.08** | 1.00 |
 | dl2020 | trunc vs ad | 0.63 | 0.42 | 0.32 | 1.75 | 1.66 |
 
-- **같은 판정자, 같은 collection 안에서** 정책 쌍에 따라 PPI 이득이 1.0배에서 1.75배까지 갈린다.
-  갈리는 기준은 전체 정확도가 아니라 해당 쌍의 불일치 구간에 오류가 집중되는지다
-  (dl2020 glob vs ad: 구간 안 0.62 vs 밖 0.27 → ρ≈0 → 이득 없음).
-- dl2019는 구간 안팎 오류가 비슷하고(0.32 vs 0.30) ρ 0.44–0.70으로 이득이 난다.
-  정확도는 dl2019 0.70, dl2020 0.66으로 거의 같다. → 정리 A의 실데이터 지지.
-- BEIR(qrels 구멍)에서는 같은 판정자의 ρ가 ≤0.27이었다. 구멍이 "오류"로 계산되어 ρ를 눌렀다는 해석과
-  일치하며, 완전 판정 pool이 왜 필요한지 보여준다.
-- 한계: query 43·54개라 ρ의 SE ≈ 0.12–0.15. 순차 인증서 비교는 T=10 한 look만 가능해 무의미.
-  ESS 이득이 T 증가와 함께 줄어드는 것은 N이 작아 Var(d̂)/N 항이 남기 때문(실배포 N≫T에서는 이론값에 접근).
-- 진행 중: Qwen3-8B UMBRELA 프롬프트 LLM 판정으로 같은 표를 재계산(`66_llm_judge.py`).
+- **With the same judge, within the same collection**, the PPI gain ranges from 1.0x to 1.75x depending on the policy pair.
+  What separates them is not overall accuracy but whether the errors are concentrated in that pair's disagreement region
+  (dl2020 glob vs ad: inside 0.62 vs outside 0.27 → ρ≈0 → no gain).
+- On dl2019 the errors inside and outside the region are similar (0.32 vs 0.30) and ρ is 0.44–0.70, so there is a gain.
+  Accuracy is nearly identical: dl2019 0.70, dl2020 0.66. → Real-data support for Theorem A.
+- On BEIR (qrels holes) the same judge had ρ ≤0.27. This is consistent with the interpretation that holes were counted as
+  "errors" and suppressed ρ, and shows why a fully judged pool is needed.
+- Limitation: with 43 and 54 queries, the SE of ρ is ≈ 0.12–0.15. A sequential-certificate comparison is possible at only the single T=10 look and hence meaningless.
+  The ESS gain shrinks as T increases because N is small and the Var(d̂)/N term remains (in real deployment with N≫T it approaches the theoretical value).
+- In progress: recompute the same table with Qwen3-8B LLM judgments using the UMBRELA prompt (`66_llm_judge.py`).
 
-### 9.7 F4 — PPI 이득은 ρ가 결정하고 정확도는 무관 (`05_results/ppi_gain/F4_gain_vs_rho_rr.png`)
+### 9.7 F4 — the PPI gain is determined by ρ, and accuracy is irrelevant (`05_results/ppi_gain/F4_gain_vs_rho_rr.png`)
 
-legacy·modern BEIR pool(각 4 collection × 3 쌍) + TREC DL(2 × 3 쌍) = 30개 (pool, 정책 쌍) 점,
-같은 판정자(Qwen3-Reranker), T=10, 300–500회 무작위 감사 추출.
+Legacy and modern BEIR pools (4 collections × 3 pairs each) + TREC DL (2 × 3 pairs) = 30 (pool, policy pair) points,
+same judge (Qwen3-Reranker), T=10, 300–500 random audit draws.
 
-| 점 집합 | n | corr(이득, ρ) | corr(이득, 전체 정확도) |
+| point set | n | corr(gain, ρ) | corr(gain, overall accuracy) |
 |---|---|---|---|
 | legacy | 12 | 0.85 | 0.74 |
 | modern | 12 | 0.90 | 0.50 |
 | trecdl | 6 | 0.95 | 0.44 |
-| 전체 | 30 | **0.94** | **−0.07** |
+| all | 30 | **0.94** | **−0.07** |
 
-점들은 이론 곡선 1/(1−ρ²)를 따른다. 전체 정확도는 pool을 섞으면 이득과 무관해진다(−0.07).
-이것이 논문의 첫 번째 그림 후보다. 주의: T=10에서 λ를 표본 내에서 추정해 ρ≈0 근처 점이 곡선 위로
-약간 뜬다(경미한 낙관). 본 실험에서는 λ를 cross-fit하거나 고정 λ 스케줄을 쓴다.
+The points follow the theoretical curve 1/(1−ρ²). Once pools are mixed, overall accuracy becomes unrelated to the gain (−0.07).
+This is the candidate for the paper's first figure. Caution: at T=10, λ is estimated in-sample, so points near ρ≈0 float
+slightly above the curve (mild optimism). In the main experiment, cross-fit λ or use a fixed λ schedule.
 
-### 9.8 LLM 판정자(Qwen3-8B, UMBRELA 프롬프트) vs reranker 판정자 — TREC DL
+### 9.8 LLM judge (Qwen3-8B, UMBRELA prompt) vs reranker judge — TREC DL
 
-| collection | 정책 쌍 | reranker ρ → LLM ρ | reranker 구간 안/밖 → LLM 구간 안/밖 | ESS 이득 T=10 (rr → LLM) |
+| collection | policy pair | reranker ρ → LLM ρ | reranker inside/outside → LLM inside/outside | ESS gain T=10 (rr → LLM) |
 |---|---|---|---|---|
 | dl2019 | glob vs trunc | 0.70 → 0.88 | 0.33/0.29 → 0.27/0.25 | 1.76 → 2.64 |
 | dl2019 | glob vs ad | 0.44 → 0.57 | 0.32/0.30 → 0.28/0.25 | 1.31 → 1.47 |
@@ -289,69 +301,68 @@ legacy·modern BEIR pool(각 4 collection × 3 쌍) + TREC DL(2 × 3 쌍) = 30�
 | dl2020 | glob vs ad | 0.01 → 0.48 | 0.62/0.27 → 0.35/0.20 | 1.08 → 1.37 |
 | dl2020 | trunc vs ad | 0.63 → 0.76 | 0.42/0.32 → 0.27/0.22 | 1.75 → 2.19 |
 
-pair 정확도는 0.70/0.66 → 0.75/0.77로 5–10점 오르는데, 이득의 변화는 쌍마다 다르다.
-LLM 판정자가 이득을 만드는 경로는 **구간 안 오류의 집중을 푸는 것**이다
-(dl2020 glob vs ad: 구간 안/밖 비 2.3배 → 1.75배, ρ 0.01 → 0.48).
-즉 "더 정확한 판정자"가 아니라 "결정 구간에서 덜 편향된 판정자"가 감사비용을 줄인다.
-F4 갱신본(`F4_gain_vs_rho.png`): 36점에서 corr(이득, ρ)=0.91, corr(이득, 정확도)=−0.07.
-ESS 이득이 이론값(최대 4.5)에 못 미치는 것은 N=43·54의 Var(d̂)/N 항 때문이다.
+Pair accuracy rises by 5–10 points, 0.70/0.66 → 0.75/0.77, yet the change in gain differs by pair.
+The route by which the LLM judge produces gain is **dissolving the concentration of errors inside the region**
+(dl2020 glob vs ad: inside/outside ratio 2.3x → 1.75x, ρ 0.01 → 0.48).
+That is, it is not "a more accurate judge" but "a judge less biased in the decision region" that reduces audit cost.
+Updated F4 (`F4_gain_vs_rho.png`): over 36 points, corr(gain, ρ)=0.91, corr(gain, accuracy)=−0.07.
+The ESS gain falls short of the theoretical value (max 4.5) because of the Var(d̂)/N term with N=43 and 54.
 
-### 9.9 착수 단계 종합 판정
+### 9.9 Overall verdict for the kickoff phase
 
-- Go/no-go #1 (현대 stack에서 구조 생존): **통과**.
-- Go/no-go #2 (판정자 오류의 결정 구간 집중과 ρ 의존): **통과** — 완전 판정 pool에서 확인,
-  판정자 두 종(reranker, 8B LLM)에서 일관.
-- Go/no-go #3 (실측 오류로 감사 절감 차이가 유의): **부분 통과** — ESS 이득 1.0–2.6배가 ρ로 설명됨.
-  순차 인증서 수준의 절감은 query가 더 많은 완전 판정 collection(TREC DL 2021–2023, LLMJudge)이 필요.
-→ 본격 착수 결정에 필요한 증거는 갖춰졌다. 다음은 ρ 하한을 소량 감사로 추정하는
-  중립성 진단(§3.2)의 이론과 구현, 방법별 독립 rng·cross-fit λ로 재현 규율 확정,
-  그리고 query가 많은 완전 판정 collection 확보.
+- Go/no-go #1 (structure survives on the modern stack): **passed**.
+- Go/no-go #2 (judge errors concentrated in the decision region and dependence on ρ): **passed** — confirmed on the fully judged pool,
+  consistent across two judge types (reranker, 8B LLM).
+- Go/no-go #3 (the difference in audit savings from measured errors is significant): **partially passed** — the ESS gain of 1.0–2.6x is explained by ρ.
+  Savings at the level of a sequential certificate require fully judged collections with more queries (TREC DL 2021–2023, LLMJudge).
+→ The evidence needed for the decision to proceed in earnest is in place. Next: the theory and implementation of the
+  neutrality diagnostic (§3.2) that estimates a lower bound on ρ from a small audit, fixing the reproducibility
+  discipline with per-method independent rng and cross-fit λ, and securing fully judged collections with many queries.
+## 10. Stage 2 Kickoff Record (2026-09-10, continued)
 
-## 10. 2단계 착수 기록 (2026-09-10, 이어서)
+### 10.1 Honest F4 after applying the reproducibility discipline (cross-fit λ, independent rng per method)
 
-### 10.1 재현 규율 적용 후의 정직한 F4 (cross-fit λ, 방법별 독립 rng)
+The F4 in §9.7 used a λ estimated in-sample. Recomputing with a cross-fit λ (two halves crossed):
 
-§9.7의 F4는 λ를 표본 내에서 추정한 값이었다. λ를 cross-fit(두 반쪽 교차)하고 다시 계산하면:
-
-| T | 점 수 | corr(이득, ρ) | corr(이득, 정확도) | 평균 이득 | 최대 이득 |
+| T | points | corr(gain, ρ) | corr(gain, accuracy) | mean gain | max gain |
 |---|---|---|---|---|---|
 | 10 | 36 | 0.73 | −0.02 | 1.01 | 2.17 |
 | 30 | 36 | 0.70 | 0.03 | 0.99 | 1.28 |
 | 90 | 24 | 0.43 | 0.12 | 0.99 | 1.03 |
 
-- **메커니즘은 유지**(ρ만이 이득을 설명, 정확도는 무관)되지만 **실현 이득의 크기는 작아진다.**
-  ρ ≥ 0.75인 LLM 판정자 쌍에서만 1.3–2.2배(dl2019 glob vs trunc, trunc vs ad), 나머지는 ≈1.0.
-- 이득이 T와 함께 줄어드는 것은 N=43–54에서 Var(d̂)/N 항이 지배하기 때문. 실배포(N ≫ T)에서는
-  이론값 1/(1−ρ²)에 접근하며, 이 점은 query 400개인 dbpedia-entity 완전 판정 pool에서 확인한다(진행 중).
-- 결론: reranker 판정자(ρ ≤ 0.3)는 실용 이득이 없다. 8B LLM 판정자는 일부 결정에서만 이득이 있고,
-  어느 결정인지는 ρ가 말해준다. → 판정자 중립성 진단이 방법의 핵심 구성요소가 된다.
+- **The mechanism holds** (only ρ explains the gain; accuracy is irrelevant), but **the magnitude of the realized gain shrinks.**
+  Only LLM judge pairs with ρ ≥ 0.75 reach 1.3–2.2x (dl2019 glob vs trunc, trunc vs ad); the rest are ≈1.0.
+- The gain decreases with T because the Var(d̂)/N term dominates at N=43–54. In real deployment (N ≫ T) it
+  approaches the theoretical value 1/(1−ρ²); this is confirmed on the completely judged dbpedia-entity pool with 400 queries (in progress).
+- Conclusion: reranker judges (ρ ≤ 0.3) offer no practical gain. The 8B LLM judge offers a gain only for some decisions,
+  and ρ tells us which ones. → The judge neutrality diagnostic becomes a core component of the method.
 
-### 10.2 중립성 진단 (`lib/neutrality.py`, `70_neutrality_eval.py`)
+### 10.2 Neutrality diagnostic (`lib/neutrality.py`, `70_neutrality_eval.py`)
 
-- Fisher-z ρ 하한은 정규 자료에서 명목 coverage(miss 0.10–0.11)이나, set-F1 차이처럼 0이 많은
-  skewed 자료에서는 miss 0.12–0.15로 부족. bootstrap 백분위 하한은 n0=30에서 0.07–0.10으로 유효하고
-  n0=10에서는 ρ=0일 때 0.14로 부족 → **pilot은 최소 20–30 query**를 권고.
-- dl1920(97 query, BEIR 학습): reranker 판정자에 대해 진단은 3–8%만 "judge 사용"을 권고(정답: 이득 없음),
-  LLM 판정자(ρ 0.41–0.48, 이론 이득 1.2–1.3)에는 25–41% 권고. 예산 투영은 N=97에서 PPI가 인간 단독보다
-  오히려 길게 나오는데(비 1.04–1.46), 이는 Var(d̂)/N 항과 cross-fit λ의 잡음 때문이며 N이 큰 pool에서 재평가.
-- bootstrap 하한을 dl1920 실자료에 적용: gain_lcb의 coverage 0.78–0.99 (reranker 0.89–0.99, LLM 0.78–0.89).
-  N=97에서 n0=20–30은 모집단의 20–30%라 유한모집단 효과가 크다. N이 큰 pool에서 재평가하고,
-  필요하면 BCa 또는 순열 기반 하한으로 교체한다. reranker 판정자에 대한 "사용 권고" 0–3%는 정답과 일치.
+- The Fisher-z lower bound on ρ has nominal coverage on normal data (miss 0.10–0.11), but on skewed data with many zeros,
+  such as set-F1 differences, it falls short with miss 0.12–0.15. The bootstrap percentile lower bound is valid at n0=30 with 0.07–0.10,
+  but at n0=10 it falls short with 0.14 when ρ=0 → **the pilot is recommended to be at least 20–30 queries.**
+- dl1920 (97 queries, BEIR training): for reranker judges the diagnostic recommends "use judge" only 3–8% of the time (ground truth: no gain);
+  for LLM judges (ρ 0.41–0.48, theoretical gain 1.2–1.3) it recommends 25–41%. The budget projection at N=97 shows PPI
+  actually taking longer than human-only (ratio 1.04–1.46), which is due to the Var(d̂)/N term and the noise of the cross-fit λ; re-evaluate on a pool with large N.
+- Applying the bootstrap lower bound to real dl1920 data: coverage of gain_lcb 0.78–0.99 (reranker 0.89–0.99, LLM 0.78–0.89).
+  At N=97, n0=20–30 is 20–30% of the population, so the finite-population effect is large. Re-evaluate on a pool with large N and,
+  if necessary, replace with a BCa or permutation-based lower bound. The 0–3% "use recommendation" for reranker judges matches the ground truth.
 
-### 10.3 완전 판정 BEIR pool (trec-covid 50q, webis-touche2020 49q, dbpedia-entity 399q) — reranker 판정자
+### 10.3 Completely judged BEIR pools (trec-covid 50q, webis-touche2020 49q, dbpedia-entity 399q) — reranker judge
 
-pool = 판정 문서를 corpus로 한 legacy pooling(4 시스템 top-30 합집합), 학습은 BEIR legacy 4개 pool.
+pool = legacy pooling with the judged documents as corpus (union of top-30 of 4 systems); training uses the 4 BEIR legacy pools.
 
-**PPI 이득(cross-fit λ)** — N이 크면 이득이 T와 함께 이론값으로 접근한다는 예측이 확인됨:
+**PPI gain (cross-fit λ)** — the prediction that with large N the gain approaches the theoretical value as T grows is confirmed:
 
-| collection | N | 쌍 | ρ | 이득 T=10 | T=30 | T=90 | 이론 |
+| collection | N | pair | ρ | gain T=10 | T=30 | T=90 | theory |
 |---|---|---|---|---|---|---|---|
 | dbpedia-entity | 399 | trunc vs ad | 0.57 | 1.17 | 1.28 | 1.27 | 1.48 |
 | dbpedia-entity | 399 | glob vs trunc | 0.54 | 1.14 | 1.21 | 1.25 | 1.41 |
 | trec-covid | 50 | trunc vs ad | 0.82 | 1.49 | 1.21 | – | 3.12 |
 | webis-touche | 49 | glob vs ad | 0.24 | 0.90 | 0.89 | – | 1.06 |
 
-**순차 인증서(dbpedia, look 10–90, 50회)** — query가 많은 완전 판정 pool에서의 첫 비교:
+**Sequential certificates (dbpedia, looks 10–90, 50 replications)** — first comparison on a completely judged pool with many queries:
 
 | method | ACT | mean T | wrong |
 |---|---|---|---|
@@ -362,50 +373,50 @@ pool = 판정 문서를 corpus로 한 legacy pooling(4 시스템 top-30 합집�
 | recal_ep (v0.3) | 0.14 | 85 | 0.10 |
 | recal_bpx | 0.02 | 90 | 0.00 |
 
-- v0.3 선택 인증서는 dbpedia에서 오류율 0.16으로 α를 명확히 넘는다(MC SE 0.04). 동시보정으로 0.10.
-- 유효한 split 인증서에 PPI를 더하면 오류 0을 유지하며 ACT가 0.14→0.18. 판정자가 약해(ρ≈0.5) 이득은 작다.
-  LLM 판정자로 재계산 예정.
-- 판정자 오류의 구간 집중은 이 세 pool에서는 약하다(dbpedia 0.29–0.34 vs 0.27). 집중 여부는 collection·판정자에
-  따라 다르며, 그래서 사전 진단이 필요하다.
+- The v0.3 selection certificate clearly exceeds α on dbpedia with an error rate of 0.16 (MC SE 0.04). With simultaneous correction, 0.10.
+- Adding PPI to the valid split certificate keeps the error at 0 while raising ACT from 0.14 to 0.18. The judge is weak (ρ≈0.5), so the gain is small.
+  To be recomputed with the LLM judge.
+- Concentration of judge errors in the decision interval is weak on these three pools (dbpedia 0.29–0.34 vs 0.27). Whether errors concentrate depends on the collection
+  and judge, which is why a prior diagnostic is needed.
 
-### 10.4 dbpedia-entity (399 query, 완전 판정) + Qwen3-8B LLM 판정자 — N이 클 때의 결과
+### 10.4 dbpedia-entity (399 queries, completely judged) + Qwen3-8B LLM judge — results at large N
 
-LLM 판정자 pair 정확도 0.76 (reranker 0.72). ρ는 0.61–0.66 (reranker 0.44–0.57).
+LLM judge pair accuracy 0.76 (reranker 0.72). ρ is 0.61–0.66 (reranker 0.44–0.57).
 
-**PPI 이득(cross-fit λ)이 T=90까지 유지됨:**
+**PPI gain (cross-fit λ) is maintained up to T=90:**
 
-| 쌍 | ρ | T=10 | T=30 | T=90 | 이론 |
+| pair | ρ | T=10 | T=30 | T=90 | theory |
 |---|---|---|---|---|---|
 | glob vs trunc | 0.66 | 1.55 | 1.54 | 1.48 | 1.78 |
 | glob vs ad | 0.61 | 1.29 | 1.42 | 1.37 | 1.58 |
 | trunc vs ad | 0.66 | 1.34 | 1.49 | 1.42 | 1.75 |
 
-**순차 인증서(look 10–90, 50회, α=0.1):**
+**Sequential certificates (looks 10–90, 50 replications, α=0.1):**
 
 | method | ACT | mean T | wrong |
 |---|---|---|---|
-| split_t (유효, 인간만) | 0.22 | 87 | 0.00 |
-| **split_ppi (유효, LLM 판정 + 인간 rectifier)** | **0.42** | 82 | 0.00 |
+| split_t (valid, human only) | 0.22 | 87 | 0.00 |
+| **split_ppi (valid, LLM judgments + human rectifier)** | **0.42** | 82 | 0.00 |
 | loo_boot (v0.3) | 0.80 | 64 | 0.00 |
 | loo_sim | 0.72 | 72 | 0.00 |
 
-- **유효한 인증서의 ACT율이 PPI로 거의 2배**(0.22 → 0.42), 잘못된 인증 0. 이것이 "AI 판정자를 안전하게
-  쓰면 인간 감사로 인증 가능한 결정이 늘어난다"는 논문의 실용 결과다.
-- 중립성 진단(pilot 20–30, bootstrap 하한): "judge 사용" 권고율 0.49–0.82 (정답: 이득 1.6–1.8배),
-  gain_lcb coverage 0.83–0.94. reranker에 대해서는 0–8%로 사용 불가를 맞힌다.
-- (주의) 이 run은 trec-covid를 학습 pool에서 제외해 §10.3과 정책 파라미터가 다르다. 최종 표는 세 collection을
-  같은 조건으로 재실행해 작성한다.
+- **The ACT rate of the valid certificate nearly doubles with PPI** (0.22 → 0.42), with 0 wrong certificates. This is the paper's practical result:
+  "using an AI judge safely increases the number of decisions certifiable by human audit."
+- Neutrality diagnostic (pilot 20–30, bootstrap lower bound): "use judge" recommendation rate 0.49–0.82 (ground truth: gain 1.6–1.8x),
+  gain_lcb coverage 0.83–0.94. For the reranker it correctly identifies unusability at 0–8%.
+- (Caution) This run excluded trec-covid from the training pools, so its policy parameters differ from §10.3. The final table will be produced by
+  re-running the three collections under identical conditions.
 
-**발견한 구현 결함(재현 규율):** left padding 배치에서 position_ids를 넘기지 않으면 padding이 큰 행의 RoPE
-위치가 밀려 출력이 붕괴한다. trec-covid LLM 판정이 49/50 query에서 전부 0이 된 원인. 수정 후 재판정 중이며,
-같은 문제가 Qwen3-Reranker 점수(batch 128)에도 영향을 주었는지 검사한다.
+**Implementation defect found (reproducibility discipline):** in left-padded batches, if position_ids are not passed, the RoPE positions of rows with
+large padding are shifted and the output collapses. This is why the trec-covid LLM judgments were all 0 on 49/50 queries. Re-judging after the fix is in progress, and
+we are checking whether the same problem affected the Qwen3-Reranker scores (batch 128).
 
-### 10.5 최종 재실행 — 세 완전 판정 collection 동일 조건 (학습: BEIR legacy 4 pool), 판정자 2종
+### 10.5 Final re-run — three completely judged collections under identical conditions (training: BEIR legacy 4 pools), two judges
 
-**reranker 점수는 padding 문제의 영향이 없음을 확인**(batch 128 vs 1, 점수 차 평균 0.001, 정확도 동일).
-LLM 판정자는 position_ids 수정 후 trec-covid 정확도 0.43 → 0.72.
+**Confirmed that reranker scores are unaffected by the padding issue** (batch 128 vs 1, mean score difference 0.001, identical accuracy).
+For the LLM judge, trec-covid accuracy after the position_ids fix went 0.43 → 0.72.
 
-**판정자 진단 (pair 정확도 / ρ 범위)**
+**Judge diagnostics (pair accuracy / ρ range)**
 
 | collection | N | reranker | LLM(8B) |
 |---|---|---|---|
@@ -413,10 +424,10 @@ LLM 판정자는 position_ids 수정 후 trec-covid 정확도 0.43 → 0.72.
 | webis-touche | 49 | 0.57 / 0.24–0.48 | 0.79 / 0.69–0.81 |
 | dbpedia-entity | 399 | 0.72 / 0.44–0.57 | 0.76 / 0.53–0.63 |
 
-**PPI 이득(cross-fit λ, T=10 / T=90)**: LLM 판정자에서 trec-covid 1.13–1.51, touche 1.12–1.46, dbpedia 1.25–1.42
-(T=90에서도 1.25–1.42 유지). reranker: touche 0.90–0.97(이득 없음), dbpedia 1.06–1.27.
+**PPI gain (cross-fit λ, T=10 / T=90)**: with the LLM judge, trec-covid 1.13–1.51, touche 1.12–1.46, dbpedia 1.25–1.42
+(1.25–1.42 maintained even at T=90). reranker: touche 0.90–0.97 (no gain), dbpedia 1.06–1.27.
 
-**순차 인증서 (dbpedia, look 10–90, 50회, α=0.1)**
+**Sequential certificates (dbpedia, looks 10–90, 50 replications, α=0.1)**
 
 | method | ACT | wrong |
 |---|---|---|
@@ -428,436 +439,435 @@ LLM 판정자는 position_ids 수정 후 trec-covid 정확도 0.43 → 0.72.
 | recal_ep (v0.3) | 0.14 | 0.10 |
 | recal_bpx | 0.02 | 0.00 |
 
-- 이 구성에서 유효 인증서의 ACT 증가는 0.14 → 0.20 (§10.4의 다른 학습 구성에서는 0.22 → 0.42).
-  고정예산 ESS 이득 1.3–1.4배가 ACT율로는 구성에 따라 1.4–2배로 나타난다. 두 구성 모두 잘못된 인증 0.
-- F4 최종(54점, cross-fit λ): T=10 corr(이득, ρ)=0.78, corr(이득, 정확도)=−0.01; T=30 0.68 / 0.04.
+- In this configuration the ACT increase of the valid certificate is 0.14 → 0.20 (in the different training configuration of §10.4 it was 0.22 → 0.42).
+  A fixed-budget ESS gain of 1.3–1.4x shows up as a 1.4–2x ACT rate depending on the configuration. Both configurations have 0 wrong certificates.
+- Final F4 (54 points, cross-fit λ): T=10 corr(gain, ρ)=0.78, corr(gain, accuracy)=−0.01; T=30 0.68 / 0.04.
 
-### 10.6 2단계 종합
+### 10.6 Stage 2 summary
 
-1. **메커니즘 확정**: PPI 감사 절감은 결정 관련 일치도 ρ가 결정하고 전체 정확도는 무관(54점, 판정자 2종, pool 4종).
-2. **실용 결과**: N이 큰 완전 판정 pool에서 LLM 판정자 + 유효 인증서로 ACT율 1.4–2배, 오류 0.
-3. **v0.3 결함 재확인**: dbpedia에서 선택 오류율 0.16, 보정 끝점검사 오류율 0.10.
-4. **중립성 진단**: bootstrap ρ 하한은 pilot ≥ 20에서 대체로 유효(coverage 0.83–0.99), reranker 사용 불가를 맞히고
-   LLM 사용을 49–82% 권고. 유한모집단·skew 보정은 후속.
-5. **남은 일**: (a) 정리 A·B·C의 증명과 anytime-valid 버전, (b) 판정자 편향이 특정 정책과 상관될 때
-   (같은 모델군 reranker 정책 + LLM 판정자)의 실측 — 현재 메뉴에는 LLM 기반 정책이 없어 미검증,
-   (c) query 수 ≥ 400인 완전 판정 collection 추가(TREC DL 2021–23 v2, LLMJudge), (d) prospective lock.
+1. **Mechanism confirmed**: the PPI audit saving is determined by the decision-relevant agreement ρ, and overall accuracy is irrelevant (54 points, 2 judges, 4 pools).
+2. **Practical result**: on a completely judged pool with large N, LLM judge + valid certificate gives a 1.4–2x ACT rate with 0 errors.
+3. **v0.3 defect reconfirmed**: on dbpedia, selection error rate 0.16, recalibrated endpoint-check error rate 0.10.
+4. **Neutrality diagnostic**: the bootstrap lower bound on ρ is largely valid at pilot ≥ 20 (coverage 0.83–0.99), correctly identifies the reranker as unusable,
+   and recommends LLM use 49–82% of the time. Finite-population and skew corrections are follow-up work.
+5. **Remaining work**: (a) proofs of Theorems A, B, C and anytime-valid versions, (b) empirical measurement when the judge's bias is correlated with a specific policy
+   (reranker policy from the same model family + LLM judge) — unverified since the current menu has no LLM-based policy,
+   (c) adding completely judged collections with ≥ 400 queries (TREC DL 2021–23 v2, LLMJudge), (d) prospective lock.
 
-## 11. 3단계 — 외부 평가 지적에 대한 응답 (2026-09-10)
+## 11. Stage 3 — Response to External Review Comments (2026-09-10)
 
-### 11.1 54점의 비독립성 → collection·판정자 안에서도 관계가 유지되는가
+### 11.1 Non-independence of the 54 points → does the relationship hold within collection and judge?
 
-- pool×판정자 6개 집단 안에서 demeaned corr(이득, ρ) = 0.64; collection×판정자 14개 집단 안에서 0.66.
-- 14개 집단(각 3개 정책 쌍) **모두** 집단 내 상관이 양수(0.48–1.00).
-- 같은 collection·정책 쌍에서 판정자를 reranker→LLM으로 바꿨을 때, ρ가 오른 13개 사례 **전부**에서 이득도 올랐다.
-→ 관계는 pooled 상관의 인공물이 아니다.
+- Within the 6 pool×judge groups, demeaned corr(gain, ρ) = 0.64; within the 14 collection×judge groups, 0.66.
+- In **all** 14 groups (3 policy pairs each), the within-group correlation is positive (0.48–1.00).
+- When the judge is switched from reranker→LLM on the same collection and policy pair, the gain also rose in **all** 13 cases where ρ rose.
+→ The relationship is not an artifact of pooled correlation.
 
-### 11.2 분모와 구간 (500회 반복, Clopper–Pearson 95%)
+### 11.2 Denominators and intervals (500 replications, Clopper–Pearson 95%)
 
-**v0.3 선택 인증서(loo_boot)의 α 초과가 구간째 확정된 셀:** modern android 73/500 = 0.146 [0.116, 0.180],
-modern scifact 90/500 = 0.180 [0.147, 0.217]. 동시보정(loo_sim)도 modern scifact 0.156 [0.125, 0.191].
-dbpedia 0.116 [0.089, 0.147], legacy scifact 0.110 [0.084, 0.141]은 경계.
-**v0.3 보정 끝점검사(recal_ep):** arguana modern 0.176 [0.144, 0.212], legacy 0.136 [0.107, 0.169] — 확정 초과.
-breakpoint+정확구간(recal_bpx)은 0.096 [0.072, 0.125] / 0.038.
-**유효 split 인증서:** 모든 24개 셀에서 wrong ≤ 4/500 (≤ 0.008, 상한 ≤ 0.020).
+**Cells where the v0.3 selection certificate (loo_boot) exceeds α with the whole interval:** modern android 73/500 = 0.146 [0.116, 0.180],
+modern scifact 90/500 = 0.180 [0.147, 0.217]. Simultaneous correction (loo_sim) also on modern scifact 0.156 [0.125, 0.191].
+dbpedia 0.116 [0.089, 0.147] and legacy scifact 0.110 [0.084, 0.141] are borderline.
+**v0.3 recalibrated endpoint check (recal_ep):** arguana modern 0.176 [0.144, 0.212], legacy 0.136 [0.107, 0.169] — confirmed exceedance.
+breakpoint+exact interval (recal_bpx) is 0.096 [0.072, 0.125] / 0.038.
+**Valid split certificates:** wrong ≤ 4/500 in all 24 cells (≤ 0.008, upper bound ≤ 0.020).
 
-**PPI가 유효 인증서의 ACT를 늘린 정도(ACT 건수/500, wrong 0–1):**
+**How much PPI increased the ACT of the valid certificate (ACT count/500, wrong 0–1):**
 
-| collection | 판정자 | split_t | split_ppi | 배수 |
+| collection | judge | split_t | split_ppi | multiple |
 |---|---|---|---|---|
 | dbpedia-entity | LLM 8B | 48 | 86 | 1.8 |
 | dbpedia-entity | reranker | 48 | 74 | 1.5 |
 | trec-covid | reranker (ρ 0.74–0.82) | 42 | 105 | 2.5 |
 | trec-covid | LLM 8B | 42 | 64 | 1.5 |
-| BEIR modern 4종 | reranker (qrels 구멍, ρ ≤ 0.3) | 43–140 | 43–139 | 1.0 |
+| BEIR modern 4 | reranker (qrels holes, ρ ≤ 0.3) | 43–140 | 43–139 | 1.0 |
 
-이전에 보고한 "0.22→0.42"(50회)는 다른 학습 구성이었고, 동일 구성 50회에서는 7→10으로 유의하지 않았다.
-500회 결과가 기준이다. 절대 ACT율은 10–21%로 낮다: ε_sel=0.01은 이 메뉴에서 여전히 엄격한 기준이다.
+The previously reported "0.22→0.42" (50 replications) was a different training configuration; with the same configuration at 50 replications it was 7→10, not significant.
+The 500-replication results are the reference. Absolute ACT rates are low at 10–21%: ε_sel=0.01 remains a strict criterion on this menu.
 
-### 11.3 coverage의 목표치
+### 11.3 Target value for coverage
 
-α=0.1이므로 gain_lcb의 목표 coverage는 0.90이다. dl1920에서 0.78–0.99, dbpedia에서 0.83–0.94로
-일부 셀이 목표에 못 미친다. 원인은 유한모집단(N=97에서 pilot 30)과 skew이며, 논문에서는
-n0 ≥ 30과 N ≫ n0를 조건으로 명시하거나 BCa/순열 하한으로 교체한다.
+Since α=0.1, the target coverage of gain_lcb is 0.90. At 0.78–0.99 on dl1920 and 0.83–0.94 on dbpedia,
+some cells fall short of the target. The causes are the finite population (pilot 30 at N=97) and skew; in the paper we
+either state n0 ≥ 30 and N ≫ n0 explicitly as conditions or replace with a BCa/permutation lower bound.
 
-### 11.4 padding 수정의 영향 범위
+### 11.4 Scope of impact of the padding fix
 
-- Qwen3-Reranker 점수: batch 128 vs 1의 차이 평균 0.001, 정확도 동일 → 기존 rr 결과 유효.
-- LLM 판정: trec-covid만 붕괴(재판정 완료, 0.43→0.72). touche·dbpedia·TREC DL은 수정 전 판정이라
-  재판정 중이며 차이를 diff로 기록한다(§11.6).
+- Qwen3-Reranker scores: mean difference between batch 128 and 1 is 0.001, identical accuracy → existing rr results are valid.
+- LLM judgments: only trec-covid collapsed (re-judging complete, 0.43→0.72). touche, dbpedia and TREC DL were judged before the fix,
+  so re-judging is in progress and the differences are recorded as a diff (§11.6).
 
-### 11.5 판정자와 같은 모델군의 정책이 메뉴에 있을 때 (자기선호 스트레스 테스트, `72_selfpref.py`)
+### 11.5 When a policy from the same model family as the judge is on the menu (self-preference stress test, `72_selfpref.py`)
 
-메뉴에 `rr_thresh`(Qwen3-Reranker 점수 ≥ θ 문서 반환) 추가. 판정자 = 동일 모델(reranker) 또는 같은 계열(Qwen3-8B).
-완전 판정 pool 5개 × 정책 쌍 6개, T=30, cross-fit λ.
+Added `rr_thresh` (return documents with Qwen3-Reranker score ≥ θ) to the menu. Judge = identical model (reranker) or same family (Qwen3-8B).
+5 completely judged pools × 6 policy pairs, T=30, cross-fit λ.
 
-| 판정자 | 쌍 유형 | n | ρ | 구간 안/밖 오류 | 판정자의 paired 편향 | PPI 이득 |
+| judge | pair type | n | ρ | error inside/outside interval | judge's paired bias | PPI gain |
 |---|---|---|---|---|---|---|
-| reranker (동일 모델) | rr_thresh 포함 | 15 | **0.25** | 0.41 / 0.31 | **−0.14** (자기 정책 과대평가) | 0.95 |
-| reranker | 비포함 | 15 | 0.57 | 0.36 / 0.32 | −0.03 | 1.07 |
-| LLM 8B (같은 계열) | rr_thresh 포함 | 15 | **0.50** | 0.28 / 0.21 | −0.03 | 1.05 |
-| LLM 8B | 비포함 | 15 | 0.73 | 0.26 / 0.22 | −0.02 | 1.22 |
+| reranker (identical model) | includes rr_thresh | 15 | **0.25** | 0.41 / 0.31 | **−0.14** (overrates its own policy) | 0.95 |
+| reranker | excludes | 15 | 0.57 | 0.36 / 0.32 | −0.03 | 1.07 |
+| LLM 8B (same family) | includes rr_thresh | 15 | **0.50** | 0.28 / 0.21 | −0.03 | 1.05 |
+| LLM 8B | excludes | 15 | 0.73 | 0.26 / 0.22 | −0.02 | 1.22 |
 
-- 판정자가 정책을 정의한 바로 그 모델이면 그 정책이 낀 비교의 ρ가 0.57→0.25로 무너지고, 판정자는 자기 정책을
-  paired F1 기준 0.14 과대평가한다. PPI 이득은 사라진다(0.95).
-- 같은 계열의 8B 판정자는 편향이 −0.03으로 작지만 ρ는 여전히 0.73→0.50으로 떨어진다
-  (collection별 Δρ: dl2019 −0.47, touche −0.44, dl2020 −0.23, dbpedia −0.04, trec-covid 0.00).
-- **유효성은 유지된다** (정리 B): 4-정책 메뉴의 순차 인증서 500회, dbpedia에서 split_t·split_ppi 모두 wrong 0/500.
-  같은 메뉴에서 split_ppi의 ACT: 동일 모델 판정자 246/500 (= split_t 245, 이득 없음) vs 8B 판정자 328/500 (1.34배).
-- 결론: "판정자 중립성"은 모델군 수준에서 실측 가능한 양이며, 중립성 진단(§10.2)이 잡아내야 할 정확히 그 상황이다.
+- When the judge is the very model that defines a policy, the ρ of comparisons involving that policy collapses from 0.57→0.25, and the judge
+  overrates its own policy by 0.14 in paired F1. The PPI gain disappears (0.95).
+- The same-family 8B judge has a small bias of −0.03, but ρ still drops from 0.73→0.50
+  (Δρ per collection: dl2019 −0.47, touche −0.44, dl2020 −0.23, dbpedia −0.04, trec-covid 0.00).
+- **Validity is preserved** (Theorem B): sequential certificates on the 4-policy menu, 500 replications, on dbpedia both split_t and split_ppi have wrong 0/500.
+  On the same menu, split_ppi ACT: identical-model judge 246/500 (= split_t 245, no gain) vs 8B judge 328/500 (1.34x).
+- Conclusion: "judge neutrality" is a quantity measurable at the model-family level, and it is exactly the situation the neutrality diagnostic (§10.2) must catch.
 
-## 12. 4단계 — 최종 인증의 유효성과 ρ 진단의 분리, 판정자 비교, 예산 곡선 (2026-09-10)
+## 12. Stage 4 — Separating Final-Certification Validity from the ρ Diagnostic, Judge Comparison, Budget Curves (2026-09-10)
 
-### 12.1 알고리즘의 의존 관계 (외부 평가 5번)
+### 12.1 Dependency structure of the algorithm (external review item 5)
 
-최종 인증(split_ppi)의 유효성은 ρ 진단과 **독립**이다. PPI++의 rectifier는 판정자가 무엇이든
-(편향·반전 포함) 인간 감사 표본에서 편향을 제거하고, λ는 cross-fit으로 [0,1]에 clip되므로 최악의 경우
-인간 단독 인증서로 퇴화한다. ρ 진단은 "이 판정자를 쓰면 얼마나 이득인가"만 결정하며 오류율에 관여하지 않는다.
+The validity of the final certification (split_ppi) is **independent** of the ρ diagnostic. The PPI++ rectifier removes bias on the human audit sample
+whatever the judge is (including biased or inverted ones), and λ is cross-fit and clipped to [0,1], so in the worst case it
+degenerates to the human-only certificate. The ρ diagnostic only determines "how much gain there is from using this judge" and plays no role in the error rate.
 
-**실측 (dbpedia-entity, look 10–190, 500회, ε=0.01, α=0.1):**
+**Empirical measurement (dbpedia-entity, looks 10–190, 500 replications, ε=0.01, α=0.1):**
 
-| 판정자 | split_ppi 누적 ACT (T=90 / 150 / 190) | wrong | 인간 단독 대비 (T=190) |
+| judge | split_ppi cumulative ACT (T=90 / 150 / 190) | wrong | vs human only (T=190) |
 |---|---|---|---|
-| 인간 단독 (split_t) | 30 / 103 / 158 | 1/500 | 1.00 |
+| human only (split_t) | 30 / 103 / 158 | 1/500 | 1.00 |
 | Qwen3-8B LLM | 56 / 172 / **244** | 0/500 | **1.54** |
 | Qwen3-Reranker | 56 / 149 / 216 | 1/500 | 1.37 |
-| MPNet rank (다른 계열, 정확도 0.64) | 32 / 100 / 160 | 2/500 | 1.01 |
-| **반전 reranker (적대적, 정확도 0.34)** | 30 / 103 / 156 | 2/500 | 0.99 |
+| MPNet rank (different family, accuracy 0.64) | 32 / 100 / 160 | 2/500 | 1.01 |
+| **inverted reranker (adversarial, accuracy 0.34)** | 30 / 103 / 156 | 2/500 | 0.99 |
 
-- 적대적 판정자에서도 오류율은 유지되고 ACT는 인간 단독과 같다(λ→0). 즉 **ρ 하한의 coverage 부족은
-  판정자 추천의 신뢰성 문제이지 최종 인증 보장의 문제가 아니다.**
-- 그림 F5(`05_results/planner_v2/F5_act_vs_budget_dbpedia-entity.png`): 예산이 늘수록 격차가 벌어진다.
-  ε=0.01은 이 메뉴에서 엄격해 T=190에서도 인간 단독은 32%만 인증하고, 8B 판정자로 49%다.
-- v0.3(loo_boot)은 T=90에서 74% 인증하지만 오류 58/500 [0.089, 0.147]. 이제 논문에서는 문제를 보여주는 비교
-  방법으로만 남긴다.
+- Even with the adversarial judge the error rate is maintained and ACT equals human-only (λ→0). That is, **the coverage shortfall of the ρ lower bound
+  is a reliability problem for the judge recommendation, not a problem for the final certification guarantee.**
+- Figure F5 (`05_results/planner_v2/F5_act_vs_budget_dbpedia-entity.png`): the gap widens as the budget grows.
+  ε=0.01 is strict on this menu, so even at T=190 human-only certifies only 32%, versus 49% with the 8B judge.
+- v0.3 (loo_boot) certifies 74% at T=90 but with errors 58/500 [0.089, 0.147]. In the paper it now remains only as a comparison
+  method that exhibits the problem.
 
-### 12.2 정책 고정, 판정자 4종 비교 (외부 평가 4번; `72_selfpref.py`, 5 pool × 6 쌍)
+### 12.2 Fixed policies, comparison of 4 judges (external review item 4; `72_selfpref.py`, 5 pools × 6 pairs)
 
-정책 4개(glob, trunc, ad, rr_thresh)는 전체 target으로 고정. 판정자: 동일 모델(reranker), 같은 계열(8B LLM),
-다른 계열(MPNet rank 규칙), 적대적(반전 reranker). 쌍을 rr_thresh 포함/비포함으로 나눔.
+The 4 policies (glob, trunc, ad, rr_thresh) are fixed as the full target. Judges: identical model (reranker), same family (8B LLM),
+different family (MPNet rank rule), adversarial (inverted reranker). Pairs are split into those including/excluding rr_thresh.
 
-| 판정자 | pair 정확도 | ρ (비포함 → 포함) | 판정자의 paired 편향 (비포함 → 포함) | 구간 안 오류 (비포함 → 포함) | PPI 이득 (비포함 → 포함) |
+| judge | pair accuracy | ρ (excl. → incl.) | judge's paired bias (excl. → incl.) | error inside interval (excl. → incl.) | PPI gain (excl. → incl.) |
 |---|---|---|---|---|---|
-| 동일 모델 (reranker) | 0.67 | 0.57 → 0.25 | −0.03 → **−0.14** | 0.36 → **0.41** | 1.07 → 0.95 |
-| 같은 계열 (8B LLM) | 0.76 | 0.73 → 0.50 | −0.02 → −0.03 | 0.26 → 0.28 | 1.22 → 1.05 |
-| 다른 계열 (MPNet) | 0.63 | 0.39 → 0.21 | −0.05 → +0.03 | 0.39 → 0.40 | 1.03 → 0.94 |
-| 적대적 (반전) | 0.34 | −0.14 → −0.04 | −0.02 → +0.24 | 0.64 → 0.59 | 0.91 → 0.93 |
+| identical model (reranker) | 0.67 | 0.57 → 0.25 | −0.03 → **−0.14** | 0.36 → **0.41** | 1.07 → 0.95 |
+| same family (8B LLM) | 0.76 | 0.73 → 0.50 | −0.02 → −0.03 | 0.26 → 0.28 | 1.22 → 1.05 |
+| different family (MPNet) | 0.63 | 0.39 → 0.21 | −0.05 → +0.03 | 0.39 → 0.40 | 1.03 → 0.94 |
+| adversarial (inverted) | 0.34 | −0.14 → −0.04 | −0.02 → +0.24 | 0.64 → 0.59 | 0.91 → 0.93 |
 
-정직한 해석:
-- rr_thresh가 낀 쌍의 ρ 하락은 **모든 판정자에서** 나타난다(MPNet도 0.39→0.21). 따라서 ρ 하락의 일부는
-  그 정책의 paired 차이가 본래 예측하기 어렵다는 "정책 난도" 효과이며, 자기선호만의 증거가 아니다.
-  외부 평가의 우려가 맞다.
-- 자기선호에 **고유한** 서명은 두 가지다: (i) 동일 모델 판정자만 자기 정책을 paired F1 0.14만큼 체계적으로
-  과대평가한다(다른 판정자는 −0.03~+0.03), (ii) 동일 모델 판정자만 구간 안 오류가 커진다(0.36→0.41).
-  같은 계열 8B는 편향이 거의 없다.
-- 편향이 있어도 유효성은 유지되고 효율만 떨어진다(§12.1, 4-정책 메뉴 500회 wrong 0/500).
-→ 논문의 주장은 "중립성 입증"이 아니라 **"판정자가 정책을 정의한 모델이면 편향과 결정구간 오류가 생기고,
-  그것이 감사 절감을 없앤다. 우리 인증서는 그때도 유효하며, ρ 진단은 그 상황을 사전에 알려준다"**로 좁힌다.
+Honest interpretation:
+- The ρ drop on pairs involving rr_thresh appears **for every judge** (MPNet too, 0.39→0.21). Hence part of the ρ drop is a
+  "policy difficulty" effect — that policy's paired differences are inherently hard to predict — and not evidence of self-preference alone.
+  The external review's concern is correct.
+- There are two signatures **unique** to self-preference: (i) only the identical-model judge systematically overrates its own policy by 0.14 in paired F1
+  (other judges −0.03 to +0.03), (ii) only the identical-model judge shows an increase in error inside the interval (0.36→0.41).
+  The same-family 8B has almost no bias.
+- Even with bias, validity is preserved and only efficiency drops (§12.1, 4-policy menu, 500 replications, wrong 0/500).
+→ The paper's claim is narrowed not to "a demonstration of neutrality" but to **"when the judge is the model that defines a policy, bias and decision-interval error
+  arise, and they eliminate the audit saving. Our certificate remains valid even then, and the ρ diagnostic warns of that situation in advance."**
 
-### 12.3 기여의 위치 (외부 평가 1번)
+### 12.3 Positioning of the contribution (external review item 1)
 
-"좋은 예측이 PPI 효율을 높인다"는 PPI++의 원리다. 이 논문의 추가는 (a) 그 효율이 **정책 선택 결정에서는
-paired 차이의 ρ**로 결정되며 판정 정확도와 분리된다는 실증(54점, 집단 내 14/14), (b) 판정자를 정의한 모델과
-정책의 관계가 ρ를 무너뜨리는 조건의 실측, (c) 소량 pilot으로 ρ 하한을 추정해 판정자 채택을 결정하고 예산을
-투영하는 절차, (d) 그 절차가 틀려도 최종 인증은 유효하다는 분리 설계다. 새 데이터에서의 최종 평가(§10.6 (d))는
-남아 있다.
+"Good predictions raise PPI efficiency" is the principle of PPI++. This paper's additions are (a) empirical evidence that, **for policy-selection decisions, that efficiency
+is determined by the ρ of paired differences** and is separate from judgment accuracy (54 points, within-group 14/14), (b) empirical measurement of the conditions under which
+the relationship between the model defining the judge and a policy collapses ρ, (c) a procedure that estimates a lower bound on ρ from a small pilot to decide judge adoption and
+project the budget, and (d) a separation design in which the final certification remains valid even when that procedure is wrong. The final evaluation on new data (§10.6 (d))
+remains.
 
-### 12.4 position_ids 수정 후 LLM 판정 재실행 — 최종 확정 (2026-09-10 09:38)
+### 12.4 Re-run of LLM judgments after the position_ids fix — final confirmation (2026-09-10 09:38)
 
-수정 전후 Qwen3-8B 판정의 차이(p_rel 평균 |차이| / 라벨 뒤집힘 비율): touche 0.005 / 0.43%,
-dbpedia 0.004 / 0.46%, dl2019 0.004 / 0.42%, dl2020 0.004 / 0.34%. trec-covid만 붕괴(0.43→0.72)였고
-나머지는 pair 정확도가 소수점 셋째 자리까지 동일. LLM 의존 실험 전부를 수정 후 판정으로 재실행한 최종값:
+Difference in Qwen3-8B judgments before and after the fix (mean |difference| in p_rel / label-flip rate): touche 0.005 / 0.43%,
+dbpedia 0.004 / 0.46%, dl2019 0.004 / 0.42%, dl2020 0.004 / 0.34%. Only trec-covid had collapsed (0.43→0.72); for the
+rest, pair accuracy is identical to the third decimal place. Final values after re-running all LLM-dependent experiments with post-fix judgments:
 
-| 결과 | 수정 전 | 최종 |
+| result | before fix | final |
 |---|---|---|
 | dbpedia split_ppi(8B) ACT/500, look ≤90 | 86 | 87 (wrong 1/500) |
-| dbpedia split_ppi(8B) 누적 ACT, look 190 | 244 | 234 (wrong 0/500); 인간 단독 158 |
-| dbpedia 4-정책 메뉴 split_ppi(8B) ACT/500 | 328 | 327 (wrong 0); split_t 245 |
+| dbpedia split_ppi(8B) cumulative ACT, look 190 | 244 | 234 (wrong 0/500); human only 158 |
+| dbpedia 4-policy menu split_ppi(8B) ACT/500 | 328 | 327 (wrong 0); split_t 245 |
 | trec-covid split_ppi(8B) ACT/500 | 64 | 64 (wrong 0) |
-| F4 (54점) corr(이득, ρ) / corr(이득, 정확도), T=10 | 0.78 / −0.01 | 0.78 / −0.02 |
-| 자기선호: 8B 판정자 ρ (비포함 → rr 포함) | 0.73 → 0.50 | 0.73 → 0.49 |
+| F4 (54 points) corr(gain, ρ) / corr(gain, accuracy), T=10 | 0.78 / −0.01 | 0.78 / −0.02 |
+| self-preference: 8B judge ρ (excl. → incl. rr) | 0.73 → 0.50 | 0.73 → 0.49 |
 
-→ §10–12의 수치는 모두 최종값 기준으로 유효하며, 이 문서의 표 중 수정 전 값과 최종값의 차이는 위 범위 안이다.
+→ All figures in §10–12 are valid on the basis of the final values, and the differences between pre-fix and final values in the tables of this document lie within the ranges above.
 
-### 12.5 다음 단계 (외부 평가의 순서대로)
+### 12.5 Next steps (in the order of the external review)
 
-1. ~~수정 후 재판정 확정~~ (완료)
-2. ~~최종 인증 절차와 ρ 진단의 역할 구분~~ (§12.1, 적대적 판정자에서도 wrong ≤ 2/500)
-3. **판정자 선택 규칙 고정**: pilot n0 ≥ 30, bootstrap ρ 하한 → gain_lcb > 1.1이면 PPI, 아니면 인간 단독.
-   규칙·ε·α·look·메뉴를 lock 문서로 고정한다.
-4. **새 데이터에서 평가**: 완전 판정 + query ≥ 100인 collection이 필요. TREC DL 2021–23(v2 corpus, 접근 확인 필요),
-   TREC Robust04(라이선스), LLMJudge/TREC RAG 2024. 접근 가능한 것을 확인한 뒤 lock → 단일 primary run.
-5. 정리 A·B·C의 증명과 anytime-valid 확장.
+1. ~~Confirm post-fix re-judging~~ (done)
+2. ~~Separate the roles of the final certification procedure and the ρ diagnostic~~ (§12.1, wrong ≤ 2/500 even with the adversarial judge)
+3. **Fix the judge selection rule**: pilot n0 ≥ 30, bootstrap lower bound on ρ → PPI if gain_lcb > 1.1, otherwise human only.
+   Fix the rule, ε, α, looks and menu in a lock document.
+4. **Evaluate on new data**: a completely judged collection with ≥ 100 queries is needed. TREC DL 2021–23 (v2 corpus, access to be confirmed),
+   TREC Robust04 (license), LLMJudge/TREC RAG 2024. After confirming which are accessible, lock → single primary run.
+5. Proofs of Theorems A, B, C and anytime-valid extension.
 
-## 13. 5단계 — 집계 기준, 조건부 유효성, 범위 정의, lock 초안 (2026-09-10)
+## 13. Stage 5 — Aggregation Criterion, Conditional Validity, Scope Definition, Lock Draft (2026-09-10)
 
-### 13.1 "누적 오류" 집계 기준 (외부 평가 1번)
+### 13.1 The "cumulative error" aggregation criterion (external review item 1)
 
-§12.4 표의 두 행은 **별개 실행**이다: look 격자 {10,…,90}(L=5)과 {10,…,190}(L=8)은 Bonferroni 분할
-α/(L·M(M−1))이 달라 같은 시점의 결정도 달라진다. 따라서 87/500(wrong 1)과 234/500(wrong 0)은 중첩 관계가 아니다.
-같은 실행(L=8) 안에서 시점별로 세면 단조성이 성립한다:
+The two rows of the §12.4 table are **separate runs**: the look grids {10,…,90} (L=5) and {10,…,190} (L=8) have different Bonferroni splits
+α/(L·M(M−1)), so decisions at the same time point also differ. Hence 87/500 (wrong 1) and 234/500 (wrong 0) are not nested.
+Counting per time point within the same run (L=8), monotonicity holds:
 
-| 판정자 | look ≤90 ACT / wrong | look ≤190 ACT / wrong |
+| judge | look ≤90 ACT / wrong | look ≤190 ACT / wrong |
 |---|---|---|
 | 8B LLM | 56 / 0 | 234 / 0 |
 | reranker | 56 / 0 | 216 / 1 |
-| 반전(적대적) | 30 / 1 | 156 / 2 |
+| inverted (adversarial) | 30 / 1 | 156 / 2 |
 
-오류 사건의 정의: planner는 첫 ACT에서 멈추며, 그 시점에 인증한 정책의 참 regret(미감사 여집합에서 계산)이 ε을
-넘으면 wrong 1건. 반복당 최대 1건이므로 wrong/500은 P(ACT ∧ regret > ε)의 추정치다. 논문 표에는 look 격자와
-L을 항상 병기한다.
+Definition of the error event: the planner stops at the first ACT, and if the true regret of the policy certified at that point (computed on the unaudited complement) exceeds ε,
+that counts as 1 wrong. Since there is at most 1 per replication, wrong/500 is an estimate of P(ACT ∧ regret > ε). Paper tables always state the look grid and
+L alongside.
 
-### 13.2 조건부 유효성 — 판정자 채택이 틀려도 인증이 유효한 이유 (외부 평가 2번)
+### 13.2 Conditional validity — why the certification is valid even when judge adoption is wrong (external review item 2)
 
-감사 표본 S_T = 학습 반쪽 A_T ∪ 검증 반쪽 B_T (앞 ⌊T/2⌋개 / 나머지).
+Audit sample S_T = training half A_T ∪ validation half B_T (first ⌊T/2⌋ / the rest).
 
-- **A_T에서 결정하는 것**: 정책 파라미터(ĉ, τ̂, θ̂), 후보 정책 m̂(LCB 규칙), 판정자 채택 여부(ρ 하한 규칙).
-- **B_T에서 계산하는 것**: 인증서. 후보 m̂와 경쟁 j의 paired 차이 D_j = u_j − u_m̂ (B_T의 인간 라벨),
-  판정자 예측 D̂_j (전 target query에 대해 고정된 함수 f의 출력), λ_j는 B_T를 두 fold로 나눠 cross-fit.
+- **Decided on A_T**: policy parameters (ĉ, τ̂, θ̂), candidate policy m̂ (LCB rule), whether to adopt the judge (ρ lower-bound rule).
+- **Computed on B_T**: the certificate. Paired differences D_j = u_j − u_m̂ between candidate m̂ and competitor j (human labels on B_T),
+  judge predictions D̂_j (the output of a fixed function f over all target queries), λ_j cross-fit by splitting B_T into two folds.
 
-**명제 B′.** 판정자 f와 A_T에서 정한 모든 선택(정책 파라미터·후보·채택 여부)이 B_T와 독립이면, 각 (look, j)에 대해
-PPI++ 추정량 μ̂_j = λ̄·mean_N(D̂_j) + mean_B(D_j − λ_j D̂_j)는 f·λ에 무관하게 μ_j − μ_m̂의 불편 추정량이고,
-t-기반 UCB는 (근사적으로) 유효하다. 채택 규칙이 "PPI 대신 t"를 고르는 경우도 같은 성질을 갖는다.
-따라서 look × 모든 순서쌍에 대한 union bound로 P(∃t: ACT_t ∧ regret > ε) ≤ α는 **A_T의 선택 결과에 조건부로**
-성립한다. ρ 하한의 coverage는 채택 결정의 품질(효율)에만 영향을 주고 이 경계에는 들어가지 않는다.
-증명은 PPI++(Angelopoulos et al. 2023)의 불편성 + 표본분할 조건부 독립 + Bonferroni. 남은 근사는 t 분포 근사와
-D̂의 N-표본이 B_T를 포함한다는 미세 의존(N ≫ |B_T|)이며, 후자는 D̂의 N-평균을 B_T 밖에서만 취하면 제거된다(구현 예정).
+**Proposition B′.** If the judge f and all choices made on A_T (policy parameters, candidate, adoption) are independent of B_T, then for each (look, j)
+the PPI++ estimator μ̂_j = λ̄·mean_N(D̂_j) + mean_B(D_j − λ_j D̂_j) is an unbiased estimator of μ_j − μ_m̂ regardless of f and λ, and the
+t-based UCB is (approximately) valid. The case where the adoption rule chooses "t instead of PPI" has the same property.
+Therefore, by a union bound over looks × all ordered pairs, P(∃t: ACT_t ∧ regret > ε) ≤ α holds **conditionally on the outcomes of the choices on A_T**.
+The coverage of the ρ lower bound affects only the quality (efficiency) of the adoption decision and does not enter this bound.
+The proof is the unbiasedness of PPI++ (Angelopoulos et al. 2023) + conditional independence from sample splitting + Bonferroni. The remaining approximations are the t-distribution approximation and
+the slight dependence from the N-sample of D̂ containing B_T (N ≫ |B_T|); the latter is removed by taking the N-mean of D̂ only outside B_T (to be implemented).
 
-**비용 회계**: pilot = A_T이므로 판정자 선택에 추가 인간 라벨은 없다. 추가 비용은 판정자 추론(전 pool pair, 예:
-dbpedia 20,573쌍)이며, 채택 규칙의 실용 가치는 그 추론을 낭비하지 않는 데 있다. "gain 하한"은 coverage가
-목표 0.90에 못 미치는 셀이 있으므로 **보장된 하한이 아니라 채택 점수**로 부른다.
+**Cost accounting**: pilot = A_T, so judge selection needs no additional human labels. The additional cost is judge inference (all pool pairs, e.g.
+20,573 pairs for dbpedia), and the practical value of the adoption rule lies in not wasting that inference. Since some cells have coverage below the
+target 0.90, the "gain lower bound" is called an **adoption score, not a guaranteed lower bound**.
 
-### 13.3 "완전 판정 pool"의 정의와 결론의 범위 (외부 평가 3번)
+### 13.3 Definition of "completely judged pool" and the scope of the conclusions (external review item 3)
 
-이 연구의 pool은 **NIST/BEIR 판정자가 실제로 판정한 (query, doc) 쌍만**으로 구성된다(TREC DL: qrels 전체;
-BEIR Tier-A: 판정 문서를 corpus로 한 4-시스템 pooling의 합집합). 미판정 문서는 pool에 없다.
-따라서 (i) 정책은 판정된 후보군 안에서 절단 위치를 고르는 정책이고, (ii) "인간 정답"은 그 후보군에 대한 판정이며,
-(iii) 결론은 "판정된 후보군 위에서의 배포 결정"으로 한정된다. 실제 배포에서 미판정 문서가 pool에 섞이면
-판정자 오류와 판정 구멍이 뒤섞이는데, 그 영향은 §9.5(BEIR sparse qrels: ρ ≤ 0.3)가 보여준다.
-미판정 문서를 '비관련'으로 두는 관행의 편향에 관한 선행연구(외부 평가가 인용한 arXiv:2405.04727 포함)는 확인 후 인용한다.
+The pools in this study consist **only of (query, doc) pairs actually judged by NIST/BEIR assessors** (TREC DL: the full qrels;
+BEIR Tier-A: the union of 4-system pooling with the judged documents as corpus). Unjudged documents are not in the pool.
+Therefore (i) the policies are policies that choose a cutoff position within the judged candidate set, (ii) the "human ground truth" is the judgment over that candidate set, and
+(iii) the conclusions are limited to "deployment decisions over the judged candidate set." In real deployment, if unjudged documents are mixed into the pool,
+judge errors and judgment holes become entangled; that effect is shown in §9.5 (BEIR sparse qrels: ρ ≤ 0.3).
+Prior work on the bias of the practice of treating unjudged documents as 'non-relevant' (including arXiv:2405.04727 cited by the external review) will be cited after verification.
 
-### 13.4 LOCK v0.4 초안 (새 데이터 평가 전 고정할 항목)
+### 13.4 LOCK v0.4 draft (items to fix before evaluation on new data)
 
-- 결정: ε_sel = 0.01, α = 0.1, look 격자 {10,30,50,70,90,120,150,190} ∩ [≤ n/2], Bonferroni over looks × M(M−1).
-- 메뉴: {glob_probe, trunc, ad_probe} (+ rr_thresh는 자기선호 분석 전용).
-- 인증서: split(앞 반쪽 학습 / 뒤 반쪽 검증), 후보 = LCB 최대, t-UCB 또는 PPI++(cross-fit λ).
-- 판정자 채택 규칙: |A_T| ≥ 30일 때 후보–차점 쌍의 bootstrap ρ 하한(level 1−α)으로 gain 점수 1/(1−lcb²) > 1.1이면
-  PPI, 아니면 t. 이 두 값은 개발 단계 선택값이며 최적성 주장 없음. 채택되지 않으면 인간 단독 인증서로 대체.
-- 판정자: Qwen3-8B UMBRELA(non-thinking, position_ids 명시), 임계 0.5. 비교용 Qwen3-Reranker-0.6B.
-- 평가: 새 collection에서 단일 primary run 500회. 보고: ACT/500, wrong/500 + Clopper–Pearson, 판정자 채택률,
-  판정자 추론 pair 수. 인간 단독·항상 PPI·규칙 기반의 3자 비교.
-- 새 collection 요건: 판정된 후보군 기준 query ≥ 200(look 190·cap n/2를 지원), 판정 깊이 문서화, 개발 미사용.
+- Decision: ε_sel = 0.01, α = 0.1, look grid {10,30,50,70,90,120,150,190} ∩ [≤ n/2], Bonferroni over looks × M(M−1).
+- Menu: {glob_probe, trunc, ad_probe} (+ rr_thresh only for the self-preference analysis).
+- Certificate: split (first half training / second half validation), candidate = LCB maximum, t-UCB or PPI++ (cross-fit λ).
+- Judge adoption rule: when |A_T| ≥ 30, PPI if the gain score 1/(1−lcb²) from the bootstrap lower bound on ρ (level 1−α) for the candidate–runner-up pair is > 1.1,
+  otherwise t. These two values are development-stage choices with no optimality claim. If not adopted, fall back to the human-only certificate.
+- Judge: Qwen3-8B UMBRELA (non-thinking, explicit position_ids), threshold 0.5. Qwen3-Reranker-0.6B for comparison.
+- Evaluation: single primary run of 500 replications on the new collection. Report: ACT/500, wrong/500 + Clopper–Pearson, judge adoption rate,
+  number of judge-inference pairs. Three-way comparison of human only, always-PPI and rule-based.
+- New collection requirements: ≥ 200 queries in terms of the judged candidate set (to support look 190 and the n/2 cap), documented judgment depth, unused in development.
 
-### 13.5 규칙 기반 판정자 채택(split_auto) vs 인간 단독 vs 항상 PPI — dbpedia, 500회, look 8개
+### 13.5 Rule-based judge adoption (split_auto) vs human only vs always PPI — dbpedia, 500 replications, 8 looks
 
-규칙: 학습 반쪽 |A_T| ≥ 30일 때 후보–차점 쌍의 bootstrap ρ 하한으로 gain 점수 > 1.1이면 PPI, 아니면 t.
+Rule: when the training half |A_T| ≥ 30, PPI if the gain score from the bootstrap lower bound on ρ for the candidate–runner-up pair is > 1.1, otherwise t.
 
-| 판정자 | 인간 단독 (T=190 누적 ACT) | 항상 PPI | 규칙 기반 | 규칙의 판정자 채택률 | wrong (셋) |
+| judge | human only (T=190 cumulative ACT) | always PPI | rule-based | rule's judge adoption rate | wrong (all three) |
 |---|---|---|---|---|---|
 | Qwen3-8B LLM | 158 | 234 | **223** | 78% | 1 / 0 / 1 |
 | Qwen3-Reranker | 158 | 216 | 179 | 44% | 1 / 1 / 2 |
-| MPNet rank (다른 계열) | 158 | 160 | 158 | 0% | 1 / 2 / 1 |
-| 반전(적대적) | 158 | 156 | 158 | 0% | 1 / 2 / 1 |
+| MPNet rank (different family) | 158 | 160 | 158 | 0% | 1 / 2 / 1 |
+| inverted (adversarial) | 158 | 156 | 158 | 0% | 1 / 2 / 1 |
 
-- 규칙은 쓸모없는 판정자(MPNet·반전)를 100% 거부하고, 8B 판정자에서는 항상-PPI 이득의 95%(65/76)를 회수한다.
-  reranker에서는 보수적(27%)이다 — ρ 하한이 0.5–0.6 근처에서 기준 1.1을 자주 못 넘기 때문.
-- **항상-PPI는 어떤 판정자에서도 유효성과 효율을 해치지 않는다**(λ→0으로 퇴화, wrong ≤ 2/500). 따라서 ACT만 보면
-  항상-PPI가 규칙보다 낫거나 같다. 규칙의 실용 가치는 (i) 판정자 추론 비용(전 pool pair)을 낭비하지 않는 것,
-  (ii) 사전에 예산을 투영하는 것이다. 논문에서는 이 점을 그대로 쓴다: "채택 규칙은 안전장치가 아니라 비용 절감 장치".
-- 한계: |A_T| ≥ 30은 총 T ≥ 60을 요구하므로 query 50개 collection(trec-covid, touche)에서는 규칙이 작동하지 않고
-  인간 단독과 같아진다. 새 collection 요건(§13.4, query ≥ 200)의 근거.
+- The rule rejects useless judges (MPNet, inverted) 100% of the time, and with the 8B judge recovers 95% (65/76) of the always-PPI gain.
+  With the reranker it is conservative (27%) — because the ρ lower bound, near 0.5–0.6, often fails to clear the 1.1 threshold.
+- **Always-PPI harms neither validity nor efficiency with any judge** (degenerates via λ→0, wrong ≤ 2/500). Hence, looking at ACT alone,
+  always-PPI is better than or equal to the rule. The practical value of the rule is (i) not wasting judge inference cost (all pool pairs),
+  (ii) projecting the budget in advance. The paper states this as is: "the adoption rule is not a safety device but a cost-saving device."
+- Limitation: |A_T| ≥ 30 requires total T ≥ 60, so on 50-query collections (trec-covid, touche) the rule does not operate and
+  reduces to human only. This is the basis for the new collection requirement (§13.4, ≥ 200 queries).
 
-### 13.6 5단계 종합
-외부 평가의 1(집계)·2(조건부 유효성)·3(범위)은 §13.1–13.3으로 답했고, 두 결정 중 lock 초안은 §13.4에 있다.
-남은 것은 (a) 명제 B′의 형식 증명과 D̂의 N-평균에서 B_T 제외 구현, (b) 접근 가능한 새 completely-judged
-collection의 확보와 primary run, (c) ρ 하한의 coverage 개선(BCa/순열) — (c)는 유효성과 무관한 효율 문제.
+### 13.6 Stage 5 summary
+External review items 1 (aggregation), 2 (conditional validity) and 3 (scope) are answered in §13.1–13.3, and of the two decisions, the lock draft is in §13.4.
+What remains is (a) the formal proof of Proposition B′ and the implementation excluding B_T from the N-mean of D̂, (b) securing an accessible new completely-judged
+collection and the primary run, (c) improving the coverage of the ρ lower bound (BCa/permutation) — (c) is an efficiency issue unrelated to validity.
 
-### 13.7 ρ 하한의 coverage 개선 — BCa (dbpedia-entity N=399, 8B 판정자, 400 draws, 목표 0.90)
+### 13.7 Improving the coverage of the ρ lower bound — BCa (dbpedia-entity N=399, 8B judge, 400 draws, target 0.90)
 
-| 쌍 (참 이득) | n0 | Fisher-z | 백분위 bootstrap | **BCa** |
+| pair (true gain) | n0 | Fisher-z | percentile bootstrap | **BCa** |
 |---|---|---|---|---|
 | glob vs ad (1.55) | 20 / 30 / 50 | 0.87 / 0.89 / 0.91 | 0.82 / 0.88 / 0.89 | 0.86 / **0.90** / **0.90** |
 | glob vs trunc (1.67) | 20 / 30 / 50 | 0.80 / 0.84 / 0.83 | 0.89 / 0.90 / 0.91 | 0.90 / **0.90** / **0.92** |
 | trunc vs ad (1.92) | 20 / 30 / 50 | 0.75 / 0.77 / 0.80 | 0.87 / 0.88 / 0.91 | 0.86 / **0.88** / **0.91** |
 
-- Fisher-z는 skew가 큰 쌍에서 0.75–0.84로 실패. BCa는 n0 ≥ 30에서 0.88–0.92 (MC SE 0.015)로 목표 0.90 안.
-- 합성 zero-inflated DGP에서도 BCa n0=30 miss 0.09–0.10(명목 0.10). n0=10은 어느 방법도 부족(0.12–0.13).
-- 채택 규칙의 판정자 사용 권고율(BCa, n0=30): 0.65–0.78 (참 이득 1.55–1.92) — 보수적이지만 방향 일치.
-→ LOCK v0.4의 채택 규칙은 **BCa 하한, n0 ≥ 30**으로 확정. 여전히 "보장"이 아니라 "채택 점수"이며(§13.2), 인증 유효성과 무관.
+- Fisher-z fails at 0.75–0.84 on pairs with large skew. BCa is within the 0.90 target at 0.88–0.92 (MC SE 0.015) for n0 ≥ 30.
+- On a synthetic zero-inflated DGP as well, BCa at n0=30 has miss 0.09–0.10 (nominal 0.10). At n0=10 no method suffices (0.12–0.13).
+- Judge-use recommendation rate of the adoption rule (BCa, n0=30): 0.65–0.78 (true gain 1.55–1.92) — conservative but directionally consistent.
+→ The adoption rule in LOCK v0.4 is fixed as **BCa lower bound, n0 ≥ 30**. It is still an "adoption score," not a "guarantee" (§13.2), and unrelated to certification validity.
 
-### 13.8 명제 B′ 구현 — D̂의 N-평균에서 검증 반쪽 제외 (dbpedia, 8B, 500회, look 8개)
+### 13.8 Implementation of Proposition B′ — excluding the validation half from the N-mean of D̂ (dbpedia, 8B, 500 replications, 8 looks)
 
-| method | 제외 전 누적 ACT (T=90/150/190) | 제외 후 | wrong |
+| method | cumulative ACT before exclusion (T=90/150/190) | after exclusion | wrong |
 |---|---|---|---|
-| split_t | 30 / 103 / 158 | 동일 | 1/500 |
+| split_t | 30 / 103 / 158 | same | 1/500 |
 | split_ppi | 56 / 168 / 234 | 61 / 168 / 222 | 0/500 |
 | split_auto | 46 / 150 / 223 | 50 / 153 / 217 | 1/500 |
 
-제외로 N이 T만큼 줄어 T=190에서 ACT가 5% 감소하지만 오류율은 그대로다. 이후 모든 실행(primary 포함)은 제외 버전.
-LOCK v0.4의 "항상 PPI" 정의도 이 버전이다.
-
+The exclusion reduces N by T, so ACT at T=190 decreases by 5%, but the error rate is unchanged. All subsequent runs (including primary) use the exclusion version.
+The definition of "always PPI" in LOCK v0.4 is also this version.
 ## 14. PRIMARY RUN — TREC DL 2021–2023 (MS MARCO v2), LOCK v0.4 (2026-09-10)
 
-Target `dl212223`: 211 query(53+76+82), 판정 passage 122,240개 중 pool 14,637 pair(query당 65–76), relevant = grade ≥ 2.
-cap = n/2 = 105이므로 look은 {10,30,50,70,90}까지만 실행됨(LOCK §2의 격자 ∩ [≤ n/2]). 500회.
-학습은 BEIR legacy 4 pool(target 무접촉). 판정 없이 pool·query 수만 확인한 뒤 lock 커밋(cb03b2b).
+Target `dl212223`: 211 queries (53+76+82), 122,240 judged passages of which the pool is 14,637 pairs (65–76 per query), relevant = grade ≥ 2.
+Since cap = n/2 = 105, looks are run only up to {10,30,50,70,90} (LOCK §2 grid ∩ [≤ n/2]). 500 draws.
+Training uses the 4 BEIR legacy pools (no contact with the target). Only pool and query counts were checked, without any judgments, before the lock commit (cb03b2b).
 
-### 14.1 reranker · 반전 판정자 (locked 프로토콜 그대로)
+### 14.1 reranker · inverted judge (locked protocol as is)
 
-| 판정자 | method | 누적 ACT (T=30/50/70/90) | wrong/500 [CP 95%] |
+| judge | method | cumulative ACT (T=30/50/70/90) | wrong/500 [CP 95%] |
 |---|---|---|---|
-| — | split_t (인간 단독) | 18 / 84 / 198 / **313** | 0 [0, 0.007] |
-| Qwen3-Reranker (정확도 0.43) | split_ppi (항상 PPI) | 15 / 52 / 136 / **256** | 0 [0, 0.007] |
-| Qwen3-Reranker | split_auto (규칙) | 18 / 84 / 194 / 309 | 0 [0, 0.007]; 채택 1.3% |
-| 반전 | split_ppi | 12 / 70 / 182 / 304 | 0 |
-| 반전 | split_auto | 18 / 84 / 198 / 313 | 0; 채택 0% |
+| — | split_t (human only) | 18 / 84 / 198 / **313** | 0 [0, 0.007] |
+| Qwen3-Reranker (accuracy 0.43) | split_ppi (always PPI) | 15 / 52 / 136 / **256** | 0 [0, 0.007] |
+| Qwen3-Reranker | split_auto (rule) | 18 / 84 / 194 / 309 | 0 [0, 0.007]; adoption 1.3% |
+| inverted | split_ppi | 12 / 70 / 182 / 304 | 0 |
+| inverted | split_auto | 18 / 84 / 198 / 313 | 0; adoption 0% |
 | — | loo_boot (v0.3) | 297 / 434 / 494 / 498 | 7 = 0.014 [0.006, 0.029] |
 | — | recal_ep (v0.3) | 5 / 9 / 10 / 12 | 10 = 0.020 |
 
-**사전 등록 기준(반전 판정자 부분)**: 유효성 통과(세 방법 모두 상한 0.007 ≤ 0.15), 규칙의 반전 판정자 채택 0% ≤ 5% 통과.
+**Pre-registered criteria (inverted-judge part)**: validity passed (upper bound 0.007 ≤ 0.15 for all three methods); the rule's adoption of the inverted judge 0% ≤ 5% passed.
 
-**새 발견 — 항상-PPI가 인간 단독보다 나빠질 수 있다.** reranker 판정자에서 split_ppi 256 < split_t 313 (−18%).
-원인 두 가지: (i) PPI++의 λ 공식이 미라벨 표본 수 N을 무시(N→∞ 가정)하는데 이 collection은 N−T = 121, 검증 45라
-n/N = 0.37; (ii) 판정자가 이 collection에서 사실상 무정보(정확도 0.43, ρ 0.29–0.45)라 fold 22개로 추정한 λ의 잡음이
-분산을 더한다. **규칙 기반 채택은 reranker를 1.3%만 받아들여 손실을 피했다(309 ≈ 313).** §13.5에서 "규칙은 비용
-절감 장치"라고 썼는데, 새 데이터에서는 **효율 보호 장치**이기도 하다는 것이 드러났다. 유효성은 어느 경우에도 유지.
+**New finding — always-PPI can be worse than human only.** With the reranker judge, split_ppi 256 < split_t 313 (−18%).
+Two causes: (i) the PPI++ λ formula ignores the number of unlabeled samples N (assumes N→∞), but in this collection N−T = 121 and validation is 45, so
+n/N = 0.37; (ii) the judge is essentially uninformative on this collection (accuracy 0.43, ρ 0.29–0.45), so the noise of λ estimated from 22 folds
+adds variance. **Rule-based adoption accepted the reranker only 1.3% of the time and avoided the loss (309 ≈ 313).** In §13.5 we wrote that "the rule is a cost-saving
+device"; the new data shows it is also an **efficiency-protection device**. Validity holds in every case.
 
-**사후 편차(post-hoc, lock 밖)**: λ를 유한 N 최적식 Cov/Var/(1+n/N)으로 바꾸면 split_ppi 256 → 282 (반전 304 → 306).
-남은 격차(282 < 313)는 λ 추정 잡음이며, "λ가 fitting fold에서 분산을 줄이지 못하면 0" 같은 안전장치가 필요하다.
-이 변경은 primary 수치를 대체하지 않고 편차로만 보고한다.
+**Post-hoc deviation (outside the lock)**: replacing λ with the finite-N optimal formula Cov/Var/(1+n/N) moves split_ppi 256 → 282 (inverted 304 → 306).
+The remaining gap (282 < 313) is λ estimation noise, and a safeguard such as "λ = 0 if it does not reduce variance on the fitting folds" is needed.
+This change does not replace the primary numbers and is reported only as a deviation.
 
-- loo_boot(v0.3)는 이 collection에서는 오류 0.014로 α 안이다(정책 격차가 커서 인증이 쉬움: ACT 498/500).
-  v0.3의 초과는 격차가 ε 근처인 collection(modern android·scifact, dbpedia)에서 나타난다.
+- loo_boot (v0.3) is within α on this collection with error 0.014 (the policy gap is large, so certification is easy: ACT 498/500).
+  The v0.3 excess appears on collections where the gap is near ε (modern android·scifact, dbpedia).
 
-### 14.2 Qwen3-8B LLM 판정자 — 사전 등록 기준 판정 (locked 프로토콜, 500회, look ≤ 90)
+### 14.2 Qwen3-8B LLM judge — pre-registered criteria verdict (locked protocol, 500 draws, look ≤ 90)
 
-판정자 pair 정확도 0.674(등급≥2 기준), ρ = 0.40 / 0.47 / 0.52, 구간 안/밖 오류 0.35–0.38 / 0.30–0.32.
+Judge pair accuracy 0.674 (grade ≥ 2 criterion), ρ = 0.40 / 0.47 / 0.52, error inside/outside the band 0.35–0.38 / 0.30–0.32.
 
-| method | 누적 ACT (T=10/30/50/70/90) | wrong/500 [CP 95%] | 채택률 |
+| method | cumulative ACT (T=10/30/50/70/90) | wrong/500 [CP 95%] | adoption rate |
 |---|---|---|---|
-| split_t (인간 단독) | 0 / 18 / 84 / 198 / **313** | 0 [0, 0.007] | — |
-| split_ppi (항상 PPI, 8B) | 11 / 38 / 105 / 220 / **318** | 0 [0, 0.007] | — |
-| split_auto (규칙, 8B) | 0 / 18 / 84 / 203 / **308** | 0 [0, 0.007] | 26% |
+| split_t (human only) | 0 / 18 / 84 / 198 / **313** | 0 [0, 0.007] | — |
+| split_ppi (always PPI, 8B) | 11 / 38 / 105 / 220 / **318** | 0 [0, 0.007] | — |
+| split_auto (rule, 8B) | 0 / 18 / 84 / 203 / **308** | 0 [0, 0.007] | 26% |
 | loo_boot (v0.3) | 95 / 297 / 434 / 494 / 498 | 7 = 0.014 [0.006, 0.029] | — |
 | recal_ep (v0.3) | 4 / 5 / 9 / 10 / 12 | 10 = 0.020 [0.010, 0.036] | — |
 
-**사전 등록 기준 결과**
+**Pre-registered criteria results**
 
-| 기준 (LOCK v0.4 §3) | 결과 |
+| criterion (LOCK v0.4 §3) | result |
 |---|---|
-| Primary — 세 방법의 wrong 상한 ≤ 0.15, 점추정 ≤ 0.10 | **통과** (모두 0/500, 상한 0.007) |
-| Secondary — split_ppi ≥ 1.2 × split_t (T=90) | **미달** (318 vs 313 = 1.02배) |
-| Secondary — split_auto ≥ split_t | **미달** (308 vs 313, −1.6%) |
-| 규칙의 반전 판정자 채택 ≤ 5% | **통과** (0%) |
+| Primary — wrong upper bound ≤ 0.15 and point estimate ≤ 0.10 for all three methods | **passed** (all 0/500, upper bound 0.007) |
+| Secondary — split_ppi ≥ 1.2 × split_t (T=90) | **not met** (318 vs 313 = 1.02×) |
+| Secondary — split_auto ≥ split_t | **not met** (308 vs 313, −1.6%) |
+| Rule's adoption of the inverted judge ≤ 5% | **passed** (0%) |
 
-**해석 (사전 등록 원칙대로 수치는 그대로 보고)**
-- 유효성 주장은 새 데이터에서 재현됐다: 판정자가 8B·reranker·반전 어느 것이든, 규칙이 판정자를 받아들이든 말든,
-  잘못된 인증은 0/500. 명제 B′의 실증.
-- 효율 주장은 이 collection에서 재현되지 않았다. PPI는 중간 look(T=50: 105 vs 84, T=70: 220 vs 198)에서 앞서지만
-  T=90에서 인간 단독이 따라잡는다. 원인은 셋이다: (i) 이 collection의 정책 격차가 커서 인간 단독이 이미 T=90에 63%를
-  인증한다(dbpedia는 T=190에도 32%), (ii) 판정자 ρ가 0.40–0.52로 dbpedia(0.53–0.66)보다 낮고, (iii) N−T = 121로
-  미라벨 표본이 작아 Var(D̂)/(N−T) 항이 이론 이득(1.19–1.38)을 상쇄한다(측정 이득 T=90에서 0.97–1.00).
-- 규칙 기반은 판정자를 26%만 채택했고 결과는 인간 단독과 동일 수준(−5건, 잡음 범위)이다. reranker에서는 손실을 막았고
-  (§14.1) 8B에서는 이득도 손실도 없었다.
-- 반전·reranker에서 확인된 "항상-PPI의 효율 손실"(§14.1)과 합치면, 새 데이터가 준 메시지는 분명하다:
-  **AI 판정자의 감사 절감은 조건부(ρ ≥ 0.6, N ≫ T, 정책 격차가 ε 근처)이고, 유효성은 무조건적이다.**
-  논문의 효율 주장은 이 조건을 명시한 형태로 축소하고, 무조건적 주장은 유효성과 "규칙이 나쁜 판정자를 걸러 손실을
-  막는다"로 한정한다.
+**Interpretation (numbers reported as is, per the pre-registration principle)**
+- The validity claim replicated on new data: whether the judge is 8B, reranker, or inverted, and whether or not the rule adopts the judge,
+  wrong certificates are 0/500. Empirical confirmation of Proposition B′.
+- The efficiency claim did not replicate on this collection. PPI leads at intermediate looks (T=50: 105 vs 84, T=70: 220 vs 198) but
+  human only catches up at T=90. There are three causes: (i) the policy gap in this collection is large, so human only already certifies 63% at T=90
+  (dbpedia is 32% even at T=190), (ii) judge ρ is 0.40–0.52, lower than dbpedia (0.53–0.66), and (iii) N−T = 121 means the
+  unlabeled sample is small, so the Var(D̂)/(N−T) term cancels the theoretical gain (1.19–1.38) (measured gain 0.97–1.00 at T=90).
+- The rule-based method adopted the judge only 26% of the time and the result is at the same level as human only (−5 cases, within noise). It prevented the loss with the reranker
+  (§14.1) and gave neither gain nor loss with 8B.
+- Combined with the "efficiency loss of always-PPI" confirmed for the inverted judge and reranker (§14.1), the message of the new data is clear:
+  **the audit savings from an AI judge are conditional (ρ ≥ 0.6, N ≫ T, policy gap near ε), while validity is unconditional.**
+  The paper's efficiency claim is narrowed to a form that states these conditions explicitly, and the unconditional claims are restricted to validity and "the rule filters out bad judges and
+  prevents loss".
 
-### 14.3 논문 상태 갱신
-- 확보: 중심 메커니즘(ρ), 유효한 인증서(개발 5 pool + 새 1 pool, 총 wrong ≤ 0.008), 조건부 유효성 이론, 판정자 채택 규칙과
-  그 안전 역할, 자기선호의 실측, 사전 등록된 외부 평가 1회(유효성 통과·효율 미달을 그대로 보고).
-- 남은 약점: 효율 이득이 조건부라는 점을 정면으로 다루는 실험 설계(격차·N·ρ를 조작한 mechanism map을 실데이터 subsample로),
-  판정자 다양성(다른 계열의 강한 LLM), anytime-valid 확장, 명제 B′의 t-근사 대신 유한표본 경계.
+### 14.3 Paper status update
+- Secured: the central mechanism (ρ), valid certificates (5 development pools + 1 new pool, total wrong ≤ 0.008), conditional validity theory, the judge adoption rule and
+  its safety role, measured self-preference, one pre-registered external evaluation (validity passed, efficiency not met, reported as is).
+- Remaining weaknesses: an experimental design that confronts head-on the fact that the efficiency gain is conditional (a mechanism map manipulating gap·N·ρ on real-data subsamples),
+  judge diversity (a strong LLM from a different family), anytime-valid extension, finite-sample bounds instead of the t-approximation in Proposition B′.
 
-## 15. 6단계 — ρ 조건 실험(mechanism map)과 다른 계열 판정자 (2026-09-10)
+## 15. Stage 6 — ρ-condition experiment (mechanism map) and a judge from a different family (2026-09-10)
 
-### 15.1 PPI가 이득이 되는 조건 — 실데이터 mechanism map (`77_rho_map.py`, F6)
+### 15.1 Conditions under which PPI gains — real-data mechanism map (`77_rho_map.py`, F6)
 
-고정예산 인증(T, 학습 반쪽/검증 반쪽, 순서쌍 Bonferroni)에서 세 축을 조작: 판정자 라벨 잡음 p ∈ {0, .3, .6, .9}
-(→ ρ 연속 감소), 미라벨 표본 N_unlab ∈ {50,100,200,300}, ε ∈ {.005,.01,.02,.05}. 300 draws/셀, 8B 판정자.
-지표: ACT(PPI)/ACT(인간 단독). 모든 셀에서 wrong ≤ 0.01.
+In fixed-budget certification (T, training half / validation half, ordered-pair Bonferroni), three axes are manipulated: judge label noise p ∈ {0, .3, .6, .9}
+(→ ρ decreases continuously), unlabeled samples N_unlab ∈ {50,100,200,300}, ε ∈ {.005,.01,.02,.05}. 300 draws/cell, 8B judge.
+Metric: ACT(PPI)/ACT(human only). wrong ≤ 0.01 in every cell.
 
 **dbpedia-entity (N=399), T=90:**
 
-| ε | N_unlab | ρ=0.26 | ρ=0.39 | ρ=0.57 | ρ=0.64 | 인간 단독 ACT |
+| ε | N_unlab | ρ=0.26 | ρ=0.39 | ρ=0.57 | ρ=0.64 | human-only ACT |
 |---|---|---|---|---|---|---|
 | 0.005 | 50 / 300 | 0.76 / 0.97 | 1.02 / 1.04 | 1.03 / **1.41** | 0.97 / **1.52** | 0.31 / 0.27 |
 | 0.01 | 50 / 300 | 0.97 / 0.98 | 0.97 / 1.06 | 1.17 / 1.22 | 0.98 / **1.39** | 0.35 / 0.33 |
 | 0.02 | 50 / 300 | 0.95 / 0.99 | 0.89 / 0.99 | 0.94 / 1.11 | 0.97 / **1.31** | 0.53 / 0.57 |
 | 0.05 | 50 / 300 | 0.97 / 0.98 | 0.95 / 1.01 | 0.95 / 1.00 | 0.95 / 1.01 | 0.92 / 0.92 |
 
-**dl212223 (N=211), T=90:** ρ가 잡음 0에서도 0.46이고 N_unlab ≤ 100이라 모든 셀에서 비 0.88–1.04 (이득 없음).
+**dl212223 (N=211), T=90:** ρ is 0.46 even at zero noise and N_unlab ≤ 100, so the ratio is 0.88–1.04 in every cell (no gain).
 
-세 조건이 **동시에** 성립해야 이득이 난다:
-1. **ρ ≥ ~0.55** — ρ ≤ 0.4에서는 N·ε과 무관하게 이득 없음(0.76–1.06).
-2. **N_unlab ≥ ~200 (≈ 2T 이상)** — ρ=0.64에서도 N_unlab=50이면 0.95–0.98, 300이면 1.31–1.52.
-3. **인증이 어려운 결정(ε ≤ 0.02, 인간 단독 ACT ≤ 0.6)** — ε=0.05처럼 인간 단독이 92%를 인증하면 이득이 사라진다.
+All three conditions must hold **simultaneously** for a gain:
+1. **ρ ≥ ~0.55** — at ρ ≤ 0.4 there is no gain regardless of N·ε (0.76–1.06).
+2. **N_unlab ≥ ~200 (≈ 2T or more)** — even at ρ=0.64, N_unlab=50 gives 0.95–0.98 while 300 gives 1.31–1.52.
+3. **A hard-to-certify decision (ε ≤ 0.02, human-only ACT ≤ 0.6)** — when human only certifies 92%, as at ε=0.05, the gain disappears.
 
-T=60에서는 같은 구조가 더 크게 나타난다(ρ=0.64, N_unlab=300, ε=0.005: 1.67배).
-→ primary run(§14)의 효율 미달은 세 조건 중 둘(ρ 0.46, N_unlab 121)의 미충족으로 정확히 설명된다.
-→ 논문 주장: "AI 판정자의 감사 절감은 ρ·N/T·결정 난이도의 곱으로 예측되며(F6), 그 조건 밖에서는 인간 단독과
-같거나 약간 못하다. 유효성은 조건과 무관하다(모든 셀 wrong ≤ 0.01)."
+At T=60 the same structure appears more strongly (ρ=0.64, N_unlab=300, ε=0.005: 1.67×).
+→ The efficiency shortfall of the primary run (§14) is exactly explained by the failure of two of the three conditions (ρ 0.46, N_unlab 121).
+→ Paper claim: "The audit savings from an AI judge are predicted by the product of ρ, N/T, and decision difficulty (F6); outside those conditions they are equal to or slightly worse than human only.
+Validity is independent of the conditions (wrong ≤ 0.01 in every cell)."
 
-## 16. 7단계 — 구간 국소 감사의 정정과 결정 가중 감사 (2026-09-10)
+## 16. Stage 7 — Correction of band-local audit and decision-weighted audit (2026-09-10)
 
-### 16.1 정정: 명제 C의 "구간 충분성"은 분모가 같을 때만 성립
-외부 평가의 반례(R_A={a}, R_B={a,b}, b 비관련: a의 관련 여부에 따라 precision 차이가 0.5 또는 0)가 맞다.
-절단점이 다르면 공통 문서가 가중치 1/k_a − 1/k_b로 남는다. 올바른 진술은 **문서별 결정 가중치**(THEORY §C 정정판):
-구간 문서 ±1/Z, 공통 문서 |1/Z_a − 1/Z_b|, 밖 0(분모가 라벨과 무관할 때). set-F1은 nG가 분모에 들어가 비선형.
-→ "구간만 판정" 대신 **"가중치 크기 순으로 판정 예산 배분"**이 규칙이고, 이는 Horvitz–Thompson 표집과
-판정자 control variate(문서 단위 PPI)로 자연스럽게 구현된다(불편성은 판정자와 무관).
+### 16.1 Correction: the "band sufficiency" of Proposition C holds only when the denominators are equal
+The external reviewer's counterexample (R_A={a}, R_B={a,b}, b non-relevant: the precision difference is 0.5 or 0 depending on whether a is relevant) is correct.
+When the cutoffs differ, a common document retains weight 1/k_a − 1/k_b. The correct statement is the **per-document decision weight** (THEORY §C, corrected version):
+band documents ±1/Z, common documents |1/Z_a − 1/Z_b|, outside 0 (when the denominator is independent of labels). set-F1 is nonlinear because nG enters the denominator.
+→ The rule is not "judge only the band" but **"allocate the judgment budget in order of weight magnitude"**, and this is implemented naturally by Horvitz–Thompson sampling and
+a judge control variate (document-level PPI) (unbiasedness is independent of the judge).
 
-### 16.2 구간 국소 하이브리드 예측기(`79_band_audit.py`) — 부정 결과
-- set-F1: 하이브리드 ρ 0.87–0.90(판정자 0.60–0.69)로 오르지만, 같은 pair 예산에서 인증율은 항상-PPI와 같거나 낮다
-  (nA=90, ε=0.01: 인간 전체 0.32 / 하이브리드 최적 배분 0.48 / 항상-PPI 0.47). rectifier용 전체 판정 query가 비싸서
-  ρ 상승이 비용으로 상쇄된다.
-- precision: 하이브리드 ρ가 오르지 않는다(0.69 vs 0.73) — 반례대로 공통 문서 가중치가 남기 때문.
-→ "구간만 판정하면 된다"는 방법은 폐기. ρ 상승 ≠ 비용 절감이라는 지적이 실험으로 확인됨.
+### 16.2 Band-local hybrid predictor (`79_band_audit.py`) — negative result
+- set-F1: the hybrid raises ρ to 0.87–0.90 (judge 0.60–0.69), but at the same pair budget the certification rate is equal to or lower than always-PPI
+  (nA=90, ε=0.01: human full 0.32 / hybrid optimal allocation 0.48 / always-PPI 0.47). The fully judged queries needed for the rectifier are expensive, so
+  the ρ increase is cancelled by cost.
+- precision: the hybrid ρ does not rise (0.69 vs 0.73) — because, as in the counterexample, the common-document weights remain.
+→ The "it suffices to judge only the band" method is discarded. The point that a ρ increase ≠ a cost saving is confirmed experimentally.
 
-### 16.3 결정 가중 문서 단위 감사(`80_weighted_audit.py`) — 네 방법, 같은 문서 판정 예산, precision utility
-후보 선택용 학습 query 20개(비용 포함) 후 남은 예산 B(문서 수)를 각 방법이 사용. dbpedia, 8B 판정자, 예비 100회:
+### 16.3 Decision-weighted document-level audit (`80_weighted_audit.py`) — four methods, same document judgment budget, precision utility
+After 20 training queries for candidate selection (cost included), each method spends the remaining budget B (number of documents). dbpedia, 8B judge, preliminary 100 draws:
 
-| 예산 (전체 판정 query 상당) | ε | 인간 전체 | **인간 가중 표집(HT)** | 기존 PPI | **가중 표집 + 판정자 CV** |
+| budget (fully judged query equivalents) | ε | human full | **human weighted sampling (HT)** | existing PPI | **weighted sampling + judge CV** |
 |---|---|---|---|---|---|
 | 60 | 0.01 | 0.17 | 0.25 | 0.23 | **0.34** |
 | 60 | 0.02 | 0.26 | 0.46 | 0.36 | **0.53** |
 | 30 | 0.02 | 0.06 | 0.04 | 0.06 | 0.11 |
 
-모든 셀 wrong 0. 외부 평가가 요구한 분해가 그대로 보인다: 이득의 큰 몫은 **판정자 없이 중요한 문서에 인간 예산을
-집중하는 것**(0.26→0.46)에서 오고, 판정자는 그 위에 추가 이득(0.46→0.53)을 준다. 기존 query 단위 PPI(0.36)는
-가중 표집 단독보다 못하다. 전체 격자(예산 3 × ε 3 × 문서/query 2 × 판정자 2 × collection 2, 300회) 실행 중.
-주의: 이 결과는 개발 데이터(dbpedia)이며 dl212223도 이미 노출되어 있으므로, 이 방법의 확증 평가는 별도의 미사용
-collection이 필요하다(§13.4 요건).
+wrong 0 in every cell. The decomposition the external reviewer asked for is visible directly: the larger share of the gain comes from **concentrating the human budget on the important documents
+without any judge** (0.26→0.46), and the judge adds a further gain on top (0.46→0.53). The existing query-level PPI (0.36) is
+worse than weighted sampling alone. The full grid (budget 3 × ε 3 × document/query 2 × judge 2 × collection 2, 300 draws) is running.
+Caution: this result is on development data (dbpedia), and dl212223 is already exposed as well, so a confirmatory evaluation of this method needs a separate unused
+collection (§13.4 requirement).
 
-### 16.4 결정 가중 문서 단위 감사 — 전체 격자 (예산 소진 수정 후, 300회, precision utility, wrong ≤ 0.003 전 셀)
+### 16.4 Decision-weighted document-level audit — full grid (after the budget-exhaustion fix, 300 draws, precision utility, wrong ≤ 0.003 in every cell)
 
-ACT율 (인간 전체 / 인간 가중 HT / 기존 query-PPI / 가중 + 판정자 CV), 괄호는 인간 전체 대비 배수:
+ACT rate (human full / human weighted HT / existing query-PPI / weighted + judge CV), multiplier relative to human full in parentheses:
 
-| collection · 판정자 | 예산 | ε=0.01 | ε=0.02 | ε=0.05 |
+| collection · judge | budget | ε=0.01 | ε=0.02 | ε=0.05 |
 |---|---|---|---|---|
 | dbpedia · 8B | 60 | 0.14 / 0.30 / 0.26 / **0.41 (2.8×)** | 0.37 / 0.44 / 0.43 / **0.58 (1.6×)** | 0.73 / 0.90 / 0.87 / **0.95** |
 | dbpedia · 8B | 90 | 0.30 / 0.37 / 0.38 / **0.46 (1.5×)** | 0.43 / 0.62 / 0.58 / **0.67 (1.6×)** | 0.81 / 0.93 / 0.90 / **0.95** |
-| dbpedia · reranker(약한 판정자) | 60 | 0.14 / 0.30 / 0.16 / **0.35 (2.4×)** | 0.37 / 0.44 / 0.38 / **0.50** | 0.73 / 0.90 / 0.75 / **0.90** |
+| dbpedia · reranker (weak judge) | 60 | 0.14 / 0.30 / 0.16 / **0.35 (2.4×)** | 0.37 / 0.44 / 0.38 / **0.50** | 0.73 / 0.90 / 0.75 / **0.90** |
 | dl212223 · 8B (ρ≈0.46) | 30 | 0.08 / 0.22 / 0.14 / **0.24 (3.1×)** | 0.14 / 0.34 / 0.24 / **0.42 (3.0×)** | 0.37 / 0.73 / 0.51 / **0.77 (2.1×)** |
 | dl212223 · 8B | 60 | 0.44 / 0.79 / 0.50 / **0.81 (1.8×)** | 0.58 / 0.77 / 0.61 / 0.77 | 0.89 / 0.87 / 0.88 / 0.87 |
 | dl212223 · 8B | 90 | 0.70 / 0.86 / 0.71 / 0.86 | 0.81 / 0.88 / 0.81 / 0.88 | 0.88 / 0.89 / 0.87 / 0.90 |
 
-읽는 법 (외부 평가의 4-방법 분해):
-1. **무조건적 이득은 판정자 없이 나온다.** 결정 가중 인간 표집(HT)만으로 같은 문서 예산에서 ACT가 1.2–2.9배.
-   인간 전체 감사가 이미 ~90%를 인증하는 셀에서만 배수 ≈ 1.
-2. **판정자는 그 위에 얹히고, 해가 되지 않는다.** 8B 판정자(ρ 0.6)에서 HT 0.30→CV 0.41; 약한 reranker에서 0.30→0.35;
-   ρ≈0.46인 dl212223에서 0.79→0.81. control variate는 불편이라 판정자가 나빠도 HT 아래로 떨어지지 않는다(전 셀 확인).
-3. **기존 query 단위 PPI는 HT 단독에 거의 항상 진다** — F6의 조건부 이득이 "잘못된 단위(query)로 판정자를 썼기 때문"이었다는 해석.
-4. 유효성은 판정자·배분과 무관(모든 셀 wrong ≤ 0.003; 추정량이 HT로 불편, 명제 B′).
+How to read it (the external reviewer's 4-method decomposition):
+1. **The unconditional gain arises without a judge.** Decision-weighted human sampling (HT) alone gives 1.2–2.9× ACT at the same document budget.
+   The multiplier is ≈ 1 only in cells where the full human audit already certifies ~90%.
+2. **The judge adds on top and does no harm.** With the 8B judge (ρ 0.6), HT 0.30→CV 0.41; with the weak reranker 0.30→0.35;
+   on dl212223 with ρ≈0.46, 0.79→0.81. The control variate is unbiased, so even a bad judge does not fall below HT (confirmed in every cell).
+3. **Existing query-level PPI almost always loses to HT alone** — the interpretation is that the conditional gain of F6 was "because the judge was used at the wrong unit (query)".
+4. Validity is independent of judge and allocation (wrong ≤ 0.003 in every cell; the estimator is unbiased via HT, Proposition B′).
 
-한계·다음: (a) precision utility(선형)에서의 결과. set-F1은 nG 비선형이라 별도 추정 필요(명제 C(c)).
-(b) 두 collection 모두 개발에 노출됨 → 이 방법의 확증은 새 lock + 미사용 collection. (c) 문서/query 표집 수 b와
-후보 선택용 학습 query 수(20)는 개발 선택값. (d) 순차(look) 버전과 anytime-valid 확장은 미구현.
+Limitations·next: (a) results are for precision utility (linear). set-F1 is nonlinear in nG and needs a separate estimator (Proposition C(c)).
+(b) Both collections are exposed to development → confirmation of this method requires a new lock + an unused collection. (c) The document/query sample count b and
+the number of training queries for candidate selection (20) are development choices. (d) The sequential (look) version and the anytime-valid extension are not implemented.
 
-## 17. 다른 계열 판정자 — Mistral-7B-Instruct-v0.3 (같은 UMBRELA 프롬프트, position_ids 명시)
+## 17. A judge from a different family — Mistral-7B-Instruct-v0.3 (same UMBRELA prompt, position_ids explicit)
 
-### 17.1 판정자 진단 (pair 정확도 / 정책 쌍 ρ)
+### 17.1 Judge diagnostics (pair accuracy / policy-pair ρ)
 
 | collection | Qwen3-8B | Mistral-7B |
 |---|---|---|
@@ -866,446 +876,445 @@ ACT율 (인간 전체 / 인간 가중 HT / 기존 query-PPI / 가중 + 판정자
 | webis-touche2020 | 0.79 / 0.81, 0.69, 0.73 | **0.51 / −0.53, 0.25, −0.45** |
 | dl212223 | 0.67 / 0.47, 0.40, 0.52 | 0.61 / 0.44, 0.42, 0.47 |
 
-- dbpedia에서는 두 판정자가 동등(Mistral이 근소 우위), trec-covid에서는 Qwen 우위, **touche(논쟁 검색)에서는 Mistral이
-  붕괴**(정확도 0.51, ρ 음수). 판정자 계열의 유불리는 collection마다 다르고, 전체 정확도가 비슷해도 ρ는 크게 갈린다.
-  → 판정자 채택은 collection별 pilot 진단으로 결정해야 한다는 §13.5의 논지를 강화.
+- On dbpedia the two judges are equivalent (Mistral marginally ahead), on trec-covid Qwen is ahead, and **on touche (argument retrieval) Mistral
+  collapses** (accuracy 0.51, negative ρ). Which judge family is favorable differs by collection, and ρ diverges widely even when overall accuracy is similar.
+  → This strengthens the argument of §13.5 that judge adoption must be decided by a per-collection pilot diagnostic.
 
-### 17.2 인증서 (500회)
+### 17.2 Certificates (500 draws)
 
-| 설정 | split_t | split_ppi (Qwen / Mistral) | split_auto (Qwen / Mistral) |
+| setting | split_t | split_ppi (Qwen / Mistral) | split_auto (Qwen / Mistral) |
 |---|---|---|---|
-| dbpedia, look 190 누적 ACT | 158 | 222 / **235** | 217 / 216 |
-| dl212223, look 90 누적 ACT (primary 프로토콜) | 313 | 318 / 304 | 308 / 308 (채택 26% / 24%) |
+| dbpedia, look 190 cumulative ACT | 158 | 222 / **235** | 217 / 216 |
+| dl212223, look 90 cumulative ACT (primary protocol) | 313 | 318 / 304 | 308 / 308 (adoption 26% / 24%) |
 
-모든 셀 wrong ≤ 1/500. Mistral도 dl212223에서는 항상-PPI가 인간 단독보다 약간 낮고(304 < 313), 규칙은 손실을 막는다.
-touche에서는 λ clip 덕에 음의 ρ에도 이득 0.98로 해가 없다.
+wrong ≤ 1/500 in every cell. For Mistral too, always-PPI on dl212223 is slightly below human only (304 < 313), and the rule prevents the loss.
+On touche, thanks to the λ clip, the gain is 0.98 even with negative ρ, so there is no harm.
 
-### 17.3 자기선호 재검(정책 고정, 판정자 6종)
+### 17.3 Self-preference re-examination (policies fixed, 6 judges)
 
-| 판정자 | ρ (rr_thresh 비포함 → 포함) | 판정자 편향 (비포함 → 포함) |
+| judge | ρ (rr_thresh excluded → included) | judge bias (excluded → included) |
 |---|---|---|
-| 동일 모델 (Qwen3-Reranker) | 0.57 → 0.25 | −0.03 → **−0.14** |
-| 같은 계열 (Qwen3-8B) | 0.69 → 0.48 | 0.00 → −0.04 |
-| **다른 계열 (Mistral-7B)** | 0.38 → 0.30 | +0.02 → −0.04 |
-| 다른 계열 (MPNet) | 0.39 → 0.21 | −0.05 → +0.03 |
+| same model (Qwen3-Reranker) | 0.57 → 0.25 | −0.03 → **−0.14** |
+| same family (Qwen3-8B) | 0.69 → 0.48 | 0.00 → −0.04 |
+| **different family (Mistral-7B)** | 0.38 → 0.30 | +0.02 → −0.04 |
+| different family (MPNet) | 0.39 → 0.21 | −0.05 → +0.03 |
 
-다른 계열 판정자에서도 rr 쌍의 ρ가 떨어지므로 ρ 하락 자체는 정책 난도 효과이고, **체계적 편향(−0.14)은 동일 모델
-판정자에만** 나타난다는 §12.2의 결론이 판정자 계열을 넓혀도 유지된다.
+Since ρ for the rr pair drops even for judges from a different family, the ρ drop itself is a policy-difficulty effect, and the conclusion of §12.2 that **systematic bias (−0.14) appears only for the same-model
+judge** holds when the judge families are broadened.
 
-### 17.4 7단계 종합
-- 판정자 다양성 확보: Qwen3-Reranker, Qwen3-8B, Mistral-7B, MPNet, 반전. 논문의 "판정자 계열" 축이 채워짐.
-- 새 방법(결정 가중 문서 단위 감사, §16.4)은 판정자 품질과 무관한 무조건적 이득(HT)과 판정자에 따른 추가 이득(CV)을
-  분리해 보여준다. 이것이 논문의 방법적 기여 후보.
-- 확증 평가는 아직 없다: dbpedia·dl212223 모두 노출. 새 lock(v0.5: 결정 가중 감사 + 채택 규칙 + set-F1 확장 여부)과
-  미사용 completely-judged collection이 필요하다.
+### 17.4 Stage 7 summary
+- Judge diversity secured: Qwen3-Reranker, Qwen3-8B, Mistral-7B, MPNet, inverted. The paper's "judge family" axis is filled.
+- The new method (decision-weighted document-level audit, §16.4) separately shows an unconditional gain independent of judge quality (HT) and an additional judge-dependent gain (CV).
+  This is the candidate methodological contribution of the paper.
+- There is no confirmatory evaluation yet: both dbpedia and dl212223 are exposed. A new lock (v0.5: decision-weighted audit + adoption rule + whether to extend to set-F1) and
+  an unused completely-judged collection are needed.
 
-## 18. 8단계 — 강한 문서 단위 비교군 (외부 평가 요청, `81_sampling_baselines.py`)
+## 18. Stage 8 — Strong document-level baselines (requested by the external reviewer, `81_sampling_baselines.py`)
 
-같은 기대 문서 판정 수, 같은 학습 query 20개(비용 포함), 같은 t 인증서. precision utility, 300회, 모든 셀 wrong ≤ 0.007.
-표집 방식 6종: 균등 / 결정 가중치 |w| 비례(중요도 표집) / |w|·√(p̂(1−p̂)) (Active-Inference형: 영향력 × 판정자 불확실성) /
-층화(pilot 20 query로 구간·공통 층의 σ 추정, |w|·σ̂) / 가중 + 판정자 control variate / 능동 + CV.
+Same expected number of document judgments, same 20 training queries (cost included), same t certificate. precision utility, 300 draws, wrong ≤ 0.007 in every cell.
+Six sampling schemes: uniform / proportional to decision weight |w| (importance sampling) / |w|·√(p̂(1−p̂)) (Active-Inference style: influence × judge uncertainty) /
+stratified (σ of band and common strata estimated from a 20-query pilot, |w|·σ̂) / weighted + judge control variate / active + CV.
 
-**ACT ≥ 50%에 필요한 예산 (전체 판정 query 상당, ε=0.02) 과 추정량 분산 비 (가중 표집 = 1)**
+**Budget needed for ACT ≥ 50% (fully judged query equivalents, ε=0.02) and estimator variance ratio (weighted sampling = 1)**
 
-| collection · 판정자 | 균등 | **가중 |w|** | 능동(불확실성) | 층화(pilot) | **가중 + CV** | 능동 + CV |
+| collection · judge | uniform | **weighted |w|** | active (uncertainty) | stratified (pilot) | **weighted + CV** | active + CV |
 |---|---|---|---|---|---|---|
-| dbpedia · 8B | >90 (분산 2.9) | 70 (1.0) | >90 (3.2) | 75 (1.0) | **55 (0.73)** | >90 (1.8) |
+| dbpedia · 8B | >90 (variance 2.9) | 70 (1.0) | >90 (3.2) | 75 (1.0) | **55 (0.73)** | >90 (1.8) |
 | dbpedia · reranker | >90 (2.9) | 70 (1.0) | >90 (2.2) | 75 (1.0) | **60 (0.88)** | 75 (1.1) |
 | dl212223 · 8B (ρ 0.46) | 80 (4.4) | 32 (1.0) | 50 (2.9) | 34 (1.0) | 31 (0.97) | 47 (2.4) |
 
-읽는 법:
-1. **큰 이득은 결정 가중치 비례 표집에서 온다**(균등 대비 분산 2.9–4.4배 감소, 예산 절반 이하). 이 부분은 중요도 표집이라는
-   표준 통계이며, 새로운 것은 **가중치가 정책 쌍의 절단점에서 닫힌 형태로 나온다는 문제 정식화**다.
-2. pilot 층화는 가중 표집과 동일(분산 1.0). 라벨 분산 추정은 |w| 이상의 정보를 주지 않는다.
-3. **판정자 불확실성 기반 능동 표집(Active-Inference형)은 여기서는 해롭다**(분산 2.2–3.2배). 판정자가 자신 있게 틀리는
-   결정 문서를 덜 뽑기 때문이며 Robust Sampling(NeurIPS 2025)의 경고와 일치. CV를 얹어도 회복되지 않는다.
-4. **판정자는 control variate로만 쓸 때 이득이 있고, 그 크기는 ρ에 따른다**: 8B·dbpedia에서 예산 −21%(분산 0.73),
-   reranker −14%, ρ 0.46인 dl212223에서는 0. 어떤 셀에서도 가중 표집보다 나빠지지 않는다(불편 추정).
+How to read it:
+1. **The large gain comes from sampling proportional to decision weight** (variance reduced 2.9–4.4× relative to uniform, budget less than half). This part is standard statistics,
+   namely importance sampling; what is new is the **problem formulation in which the weights come out in closed form at the cutoffs of the policy pair**.
+2. Pilot stratification is identical to weighted sampling (variance 1.0). Estimating label variance gives no information beyond |w|.
+3. **Active sampling based on judge uncertainty (Active-Inference style) is harmful here** (variance 2.2–3.2×). This is because it undersamples decision documents on which the judge is confidently wrong,
+   consistent with the warning in Robust Sampling (NeurIPS 2025). Adding CV does not recover it.
+4. **The judge gives a gain only when used as a control variate, and its size depends on ρ**: on 8B·dbpedia, budget −21% (variance 0.73),
+   reranker −14%, and 0 on dl212223 with ρ 0.46. In no cell is it worse than weighted sampling (unbiased estimation).
 
-→ 강한 비교군을 넣은 뒤 남는 기여: (a) 정책 쌍 인증을 위한 결정 가중치의 닫힌 형태와 그에 따른 예산 배분,
-(b) "판정자는 표집 지침이 아니라 control variate로" 라는 실증적 규칙(능동 표집은 해로움, CV는 무해·조건부 이득),
-(c) 두 요소를 유효한 인증서(B′)에 결합. 절감 배수의 정의는 **같은 오류 통제·같은 ACT 50%에 필요한 인간 판정 수**로 고정.
-새로움은 "새 추정 이론"이 아니라 "결정 문제로의 정확한 사상과 그 결과"에 있음을 논문에서 명시한다.
+→ Contributions remaining after the strong baselines are included: (a) the closed form of the decision weights for policy-pair certification and the resulting budget allocation,
+(b) the empirical rule "the judge as a control variate, not as a sampling guide" (active sampling harmful, CV harmless with conditional gain),
+(c) the combination of the two components in a valid certificate (B′). The definition of the savings multiplier is fixed as **the number of human judgments needed for the same error control and the same ACT 50%**.
+The paper states explicitly that the novelty lies not in "new estimation theory" but in "the exact mapping to the decision problem and its consequences".
 
-## 19. 9단계 — 충실한 Active Inference 비교 (마지막 핵심 점검, `82_active_inference.py`)
+## 19. Stage 9 — Faithful Active Inference comparison (final key check, `82_active_inference.py`)
 
-추정 대상 D(q) = Σ_d w_d y_d에 맞춘 능동 표집 π_d ∝ |w_d|·√E[(y_d−ĵ_d)²] (Zrnic & Candès의 최적 규칙을 가중 추정량에
-적용), 잔차 E[(y−ĵ)²]는 pilot 20 query의 라벨에서 판정자 확률 10구간별로 추정. 강건 혼합은 π = (1−γ)π_능동 + γπ_가중.
-같은 pilot(비용 포함), 같은 실제 판정 문서 수, 같은 인증서. 300회, 모든 셀 wrong ≤ 0.003.
+Active sampling matched to the estimand D(q) = Σ_d w_d y_d, π_d ∝ |w_d|·√E[(y_d−ĵ_d)²] (the optimal rule of Zrnic & Candès applied to the weighted estimator),
+with the residual E[(y−ĵ)²] estimated from the labels of a 20-query pilot in 10 bins of judge probability. The robust mixture is π = (1−γ)π_active + γπ_weighted.
+Same pilot (cost included), same actual number of judged documents, same certificate. 300 draws, wrong ≤ 0.003 in every cell.
 
-**ACT ≥ 50% 도달 예산(전체 판정 query 상당, ε=0.02) / 실제 판정 문서 수(B=60 기준) / 분산 비(가중+CV = 1)**
+**Budget to reach ACT ≥ 50% (fully judged query equivalents, ε=0.02) / actual number of judged documents (at B=60) / variance ratio (weighted+CV = 1)**
 
-| collection · 판정자 | 가중+CV | 능동(보정 가정) | **능동(잔차 추정)** | 강건 0.5 | 강건 0.3 | 실제 문서 수 |
+| collection · judge | weighted+CV | active (calibration assumption) | **active (residual estimate)** | robust 0.5 | robust 0.3 | actual document count |
 |---|---|---|---|---|---|---|
 | dbpedia · 8B | 54.8 (1.00) | 70.6 (1.48) | 56.3 (1.00) | 54.4 (0.99) | 55.0 (1.01) | 1,710 |
 | dbpedia · reranker | 58.7 (1.00) | 71.8 (1.28) | 60.0 (0.97) | 57.0 (0.98) | 57.4 (0.96) | 1,710 |
 | dl212223 · 8B | 33.8 (1.00) | 38.7 (1.30) | 33.2 (0.95) | 32.5 (0.95) | 31.9 (0.96) | 2,431 |
 
-**결론.** 잔차를 pilot에서 추정한 충실한 Active Inference와 강건 혼합은 결정 가중+CV와 **동일**하다(분산 비 0.95–1.01,
-도달 예산 ±2 query 상당). 앞선 §18의 "능동 표집이 해롭다"는 결론은 **보정 가정 버전에 한정**되며 철회한다.
-즉 우리 방법은 올바른 추정 대상 위에서의 active/prediction-powered inference와 같은 것이다.
+**Conclusion.** Faithful Active Inference with residuals estimated from the pilot, and the robust mixture, are **identical** to decision-weighted+CV (variance ratio 0.95–1.01,
+budget to reach within ±2 query equivalents). The earlier conclusion of §18 that "active sampling is harmful" is **limited to the calibration-assumption version** and is withdrawn.
+That is, our method is the same thing as active/prediction-powered inference on the correct estimand.
 
-**기여의 최종 위치 (정직하게):**
-1. 새 추정·표집 이론은 없다. 기존 원리(중요도 표집, PPI/능동 추론, 표본분할 + Bonferroni)가 정책 인증 문제에 그대로 적용된다.
-2. 남는 기여는 (a) 정책 쌍 인증의 결정 가중치가 절단점에서 닫힌 형태로 나온다는 **문제 사상**과 그로부터 따라오는 예산 배분,
-   (b) 판정자를 표집 규칙에 쓸 때 보정 가정이 실패하는 양상과 control variate로 쓸 때의 무해성·조건부 이득(ρ·N/T·난이도, F6),
-   (c) 동일 모델 판정자의 자기선호 실측, (d) 판정자와 무관한 인증 유효성(B′)과 사전 등록된 외부 평가 1회.
-3. 따라서 논문은 "기존 추론·표집 원리를 AI 판정자 시대의 정책 배포 인증에 정확히 연결하고, 적용 조건과 실패 양상을 보인
-   연구"로 쓴다. 이는 견고한 TMLR 논문의 재료이며, Featured에 필요한 독창적 방법론은 현재 근거로는 확보되지 않았다.
+**Final position of the contribution (honestly):**
+1. There is no new estimation or sampling theory. Existing principles (importance sampling, PPI/active inference, sample splitting + Bonferroni) apply directly to the policy certification problem.
+2. The remaining contributions are (a) the **problem mapping** in which the decision weights of policy-pair certification come out in closed form at the cutoffs, and the budget allocation that follows from it,
+   (b) how the calibration assumption fails when the judge is used in the sampling rule, and the harmlessness and conditional gain (ρ·N/T·difficulty, F6) when it is used as a control variate,
+   (c) measured self-preference of the same-model judge, (d) certification validity independent of the judge (B′) and one pre-registered external evaluation.
+3. Therefore the paper is written as "a study that connects existing inference and sampling principles precisely to policy deployment certification in the era of AI judges, and shows the conditions of application and the failure modes".
+   This is material for a solid TMLR paper; the original methodology needed for Featured is not secured on current evidence.
 
-**다음 결정(사용자):** (i) 이 위치로 논문을 완성(F1 확장은 부록, 새 collection 1개로 사상 기반 방법의 확증) vs
-(ii) Featured를 위해 새로운 질문을 찾는다 — 후보: 여러 정책 비교에서 같은 인간 라벨을 재사용하는 구조의 최적 배분(메뉴 전체에
-대한 결정 가중치의 결합), 순차·anytime 버전에서의 예산 정지 규칙.
+**Next decision (user):** (i) complete the paper at this position (F1 extension in the appendix, confirmation of the mapping-based method on 1 new collection) vs
+(ii) find a new question for Featured — candidates: optimal allocation in a structure that reuses the same human labels across comparisons of multiple policies (combining decision weights over the whole
+menu), budget stopping rules in the sequential/anytime version.
 
-## 20. 탐색 종료와 논문 경로 확정 (2026-09-10)
+## 20. End of exploration and paper path fixed (2026-09-10)
 
-범위 제한 탐색(메뉴 수준 감사 배분, `EXPLORATION_menu_allocation.md`)은 사전 기준을 충족하지 못했다: 적응 배분은 라벨 공유를
-허용한 정적 합산 배분과 동일하고, 참 격차를 아는 oracle도 5–18%만 앞선다. 부정 결과로 부록에 보존하고 종료한다.
+The scope-limited exploration (menu-level audit allocation, `EXPLORATION_menu_allocation.md`) did not meet the pre-specified criteria: adaptive allocation is identical to static summed allocation
+with label sharing allowed, and even an oracle that knows the true gaps leads by only 5–18%. It is preserved in the appendix as a negative result and closed.
 
-**확정된 논문 주장(외부 평가 제안 그대로):**
-> 정책을 인증하는 데 필요한 추정 대상을 정확히 정의하면, 기존 표집·예측 보정 방법을 효율적으로 적용할 수 있다.
-> 판정자의 전체 정확도만으로는 그 효율을 예측하기 어렵고, 잘못된 불확실성 가정은 표집 효율을 떨어뜨릴 수 있다.
+**Fixed paper claim (as proposed by the external reviewer):**
+> If the estimand needed to certify a policy is defined precisely, existing sampling and prediction-correction methods can be applied efficiently.
+> The judge's overall accuracy alone is a poor predictor of that efficiency, and a wrong uncertainty assumption can reduce sampling efficiency.
 
-**원고 완성에 남은 작업(경로 1):**
-1. 추정량과 active inference의 관계를 수식으로 명시(THEORY 마지막 절, 완료) — "우월" 주장 없음.
-2. set-F1 확장은 논문 주장을 뒷받침하는 범위로 제한(nG의 PPI 보정 부록 + precision 주 결과).
-3. 이득 지표를 "같은 오류 통제에서 ACT 50%에 필요한 실제 인간 판정 수"로 통일하고, 도달 못 한 셀은 배수를 계산하지 않음.
-4. 사전 등록된 dl212223 결과(유효성 통과·효율 미달)는 그대로 보고하고, 이후 방법 변경은 후속 탐색으로 구분.
-5. 미사용 completely-judged collection 1개에서 사상 기반 방법(결정 가중 + CV + 채택 규칙)의 확증 평가(LOCK v0.5).
-6. 기존 문헌 대비 새 통찰의 정도(자기선호, 보정 가정 실패, 조건 지도)를 관련연구 절에서 정확히 위치시킴.
+**Remaining work to complete the manuscript (path 1):**
+1. State the relation between the estimator and active inference in formulas (last section of THEORY, done) — no "superiority" claim.
+2. Limit the set-F1 extension to the scope that supports the paper's claim (PPI correction of nG in the appendix + precision as the main result).
+3. Unify the gain metric as "the actual number of human judgments needed for ACT 50% under the same error control", and do not compute a multiplier for cells that do not reach it.
+4. Report the pre-registered dl212223 result (validity passed, efficiency not met) as is, and separate subsequent method changes as follow-up exploration.
+5. Confirmatory evaluation of the mapping-based method (decision weighting + CV + adoption rule) on 1 unused completely-judged collection (LOCK v0.5).
+6. Position precisely, in the related-work section, the degree of new insight relative to the existing literature (self-preference, calibration-assumption failure, condition map).
 
-## 21. LOCK v0.5 확증 평가 — TREC CAsT 2019 (MARCO 제한, 159 turn, pool/turn 48.7) — 2026-09-10
+## 21. LOCK v0.5 confirmatory evaluation — TREC CAsT 2019 (MARCO-restricted, 159 turns, pool/turn 48.7) — 2026-09-10
 
-판정자 Qwen3-8B: pair 정확도 0.79, 등급 상관 0.66, 정책 쌍 ρ 평균 0.62 (지금까지 가장 좋은 판정자 조건).
+Judge Qwen3-8B: pair accuracy 0.79, grade correlation 0.66, mean policy-pair ρ 0.62 (the best judge conditions so far).
 
-### 21.1 사전 등록 기준 판정 (locked 예산 격자 {30,45,60,90} query 상당, ε ∈ {0.01,0.02}, 300 draws)
+### 21.1 Pre-registered criteria verdict (locked budget grid {30,45,60,90} query equivalents, ε ∈ {0.01,0.02}, 300 draws)
 
-| 기준 | 결과 |
+| criterion | result |
 |---|---|
-| P1 유효성 (경계 스트레스, 20 arm×예산 셀) | **통과** — 1종 오류 최대 0.013(uniform), 나머지 ≤ 0.003 |
-| P2 무조건적 이득 J50(weighted) ≤ 0.6·J50(uniform) | **평가 불가 → 미충족** — 어떤 arm도 locked 최대 예산에서 ACT 50% 미도달 |
-| P3 판정자 무해성 (8B·reranker·반전) | **통과** (최대 예산 ACT 비교 규칙: 0.42/0.39/0.36 vs weighted 0.387, 허용 −0.05 이내) |
-| P4 능동 추론 동등성 | **평가 불가 → 미충족** (J50 미정의) |
-| S1 조건부 판정자 이득 (ρ ≥ 0.55이면 기대) | ρ = 0.62 → 이득 기대; J50 미정의로 비 계산 불가 |
-| S2 보정 가정 규칙 열세 | J50 미정의 |
+| P1 validity (boundary stress, 20 arm×budget cells) | **passed** — type I error at most 0.013 (uniform), the rest ≤ 0.003 |
+| P2 unconditional gain J50(weighted) ≤ 0.6·J50(uniform) | **not evaluable → not met** — no arm reached ACT 50% at the locked maximum budget |
+| P3 judge harmlessness (8B·reranker·inverted) | **passed** (maximum-budget ACT comparison rule: 0.42/0.39/0.36 vs weighted 0.387, within the −0.05 tolerance) |
+| P4 active inference equivalence | **not evaluable → not met** (J50 undefined) |
+| S1 conditional judge gain (expected if ρ ≥ 0.55) | ρ = 0.62 → gain expected; ratio not computable because J50 is undefined |
+| S2 calibration-assumption rule inferiority | J50 undefined |
 
-**lock 설계 결함의 기록.** 이 collection은 대화형 질의(BM25·bi-encoder에 어려움)라 정책 격차가 작고 인증이 어렵다.
-locked 최대 예산 90 query 상당(≈2,100 판정 쌍, pilot 포함)에서 최고 ACT는 0.43이었다. J50 기준을 쓰려면 예산 격자를 collection의
-난이도에 맞춰 잡았어야 했다(예: 도달 예산의 사전 추정). 이는 §14의 두 번째 교훈이다: **사전 등록 기준은 "최대 예산 ACT"처럼
-항상 정의되는 지표를 포함해야 한다.** P2·P4는 규정대로 미충족으로 남긴다.
+**Record of a lock design flaw.** This collection consists of conversational queries (hard for BM25·bi-encoder), so the policy gap is small and certification is hard.
+At the locked maximum budget of 90 query equivalents (≈2,100 judged pairs, pilot included) the best ACT was 0.43. To use the J50 criterion, the budget grid should have been set to the collection's
+difficulty (e.g., a prior estimate of the budget to reach it). This is the second lesson of §14: **pre-registered criteria must include a metric that is always defined, such as "ACT at maximum budget".**
+P2·P4 remain not met, as the rules require.
 
-### 21.2 locked 격자 안에서 관찰된 것 (사전 등록된 지표는 아니지만 같은 실행의 수치)
-최대 locked 예산(90 query 상당 ≈ 2,100 판정 쌍), ε = 0.02, ACT율:
+### 21.2 What was observed within the locked grid (not pre-registered metrics, but numbers from the same run)
+Maximum locked budget (90 query equivalents ≈ 2,100 judged pairs), ε = 0.02, ACT rate:
 
-| 균등 | 가중 |w| | 층화(pilot) | 능동(보정 가정) | 능동(잔차 추정) | 강건 0.5 | **가중 + 8B CV** | 가중 + reranker CV | 가중 + 반전 CV |
+| uniform | weighted |w| | stratified (pilot) | active (calibration assumption) | active (residual estimate) | robust 0.5 | **weighted + 8B CV** | weighted + reranker CV | weighted + inverted CV |
 |---|---|---|---|---|---|---|---|---|
 | 0.09 | 0.39 | 0.37 | 0.22 (+CV 0.39) | 0.43 | 0.42 | **0.42** | 0.39 | 0.36 |
 
-- 결정 가중 표집 대 균등: 4.4배 (방향·크기 모두 §18과 일치).
-- 판정자 CV의 증분: +9% (0.387 → 0.42), ρ 0.62에서 기대한 "작은 양의 이득" 범위.
-- 잔차 추정 능동 추론 ≈ 가중+CV (0.43 vs 0.42); 보정 가정 규칙은 그보다 낮음(0.39; 표집만 쓰면 0.22).
-- 반전 판정자에서 CV가 가중 표집보다 0.025 낮음: λ 없이 계수 1로 쓰는 문서 단위 CV는 판정자가 적대적일 때 분산을 약간
-  더할 수 있다(불편성은 유지). → 문서 단위 CV에도 fold 교차 λ를 넣는 것이 다음 수정 사항.
-- query 단위(set-F1, 보조): T=70에서 split_t 48 / split_ppi(8B) **100** / reranker 57 / 반전 42, wrong 전부 0/500.
-  F6 조건(ρ 0.62, 어려운 결정, N_unlab 89)에 맞게 8B 판정자의 query 단위 이득이 2.1배로 나타났다.
+- Decision-weighted sampling vs uniform: 4.4× (direction and size both consistent with §18).
+- Increment from the judge CV: +9% (0.387 → 0.42), within the range of the "small positive gain" expected at ρ 0.62.
+- Residual-estimate active inference ≈ weighted+CV (0.43 vs 0.42); the calibration-assumption rule is lower (0.39; 0.22 with sampling only).
+- With the inverted judge, CV is 0.025 below weighted sampling: a document-level CV used with coefficient 1 and no λ can add a little variance when the judge is adversarial
+  (unbiasedness is preserved). → Adding a fold-crossed λ to the document-level CV as well is the next fix.
+- Query level (set-F1, auxiliary): at T=70, split_t 48 / split_ppi (8B) **100** / reranker 57 / inverted 42, wrong all 0/500.
+  Consistent with the F6 conditions (ρ 0.62, hard decision, N_unlab 89), the query-level gain of the 8B judge came out at 2.1×.
 
-### 21.3 사후 분석 (post-hoc, 명시)
-예산 {120, 150} query 상당을 추가 실행해 J50을 계산한다(§21.4에 기록). 사전 등록 판정은 §21.1이 최종이다.
+### 21.3 Post-hoc analysis (explicitly post-hoc)
+Budgets {120, 150} query equivalents are run additionally to compute J50 (recorded in §21.4). The pre-registered verdict of §21.1 is final.
 
-### 21.4 사후 분석 (post-hoc): 예산 {120, 150} 추가 후 J50 (ε = 0.02, 판정 쌍; 23.4쌍 / query 상당; wrong ≤ 0.003)
+### 21.4 Post-hoc analysis: J50 after adding budgets {120, 150} (ε = 0.02, judged pairs; 23.4 pairs / query equivalent; wrong ≤ 0.003)
 
-| 균등 | 가중 |w| | 층화 | 능동(보정 가정)+CV | 능동(잔차)+CV | 강건+CV | 가중+8B CV | 가중+reranker CV | **가중+반전 CV** |
+| uniform | weighted |w| | stratified | active (calibration assumption)+CV | active (residual)+CV | robust+CV | weighted+8B CV | weighted+reranker CV | **weighted+inverted CV** |
 |---|---|---|---|---|---|---|---|---|
-| 미도달 (ACT 0.23 @150) | 2,750 | 2,993 | 2,732 | 2,808 | 2,780 | 2,632 | 2,787 | **3,194** |
+| not reached (ACT 0.23 @150) | 2,750 | 2,993 | 2,732 | 2,808 | 2,780 | 2,632 | 2,787 | **3,194** |
 
-- P2의 취지(가중 ≫ 균등)는 확장 격자에서 성립(균등은 150에서도 미도달). P4의 취지(잔차 능동 ≈ 가중+CV)도 성립(±5%,
-  같은 arm의 rng 차이가 2,632 vs 2,878로 그 정도의 잡음을 가짐).
-- 판정자 증분은 ρ 0.62에서 −4%(8B), +1%(reranker): F6·§18의 예측대로 "작은 이득".
-- **새 발견: 반전 판정자에서 문서 단위 CV가 가중 표집보다 16% 나쁘다.** 계수 1의 control variate는 판정자가 적대적일 때
-  분산을 더한다(불편성은 유지). query 단위 PPI에서 λ가 하던 역할이 문서 단위에는 없었다. → pilot에서 추정한 λ(참 paired 차이를
-  판정 paired 차이에 회귀, [0,1] clip)를 CV 계수로 쓰는 `weighted_cvl`을 추가(81, post-hoc). λ=0이면 HT로 퇴화.
-  §16–19의 "판정자는 해가 없다"는 문장은 **λ가 있을 때**로 한정해야 한다.
-- 이 수정은 LOCK v0.5 이후의 것이므로 확증이 아니며, 세 번째 미사용 collection에서 lock 후 검증할 항목이다.
+- The intent of P2 (weighted ≫ uniform) holds on the extended grid (uniform is not reached even at 150). The intent of P4 (residual active ≈ weighted+CV) also holds (±5%;
+  the rng difference within the same arm, 2,632 vs 2,878, carries about that much noise).
+- The judge increment at ρ 0.62 is −4% (8B), +1% (reranker): a "small gain", as predicted by F6·§18.
+- **New finding: with the inverted judge, the document-level CV is 16% worse than weighted sampling.** A control variate with coefficient 1 adds variance when the judge is adversarial
+  (unbiasedness is preserved). The role that λ played in query-level PPI was absent at the document level. → `weighted_cvl` is added (81, post-hoc), which uses a λ estimated from the pilot (regression of the true paired difference
+  on the judged paired difference, clipped to [0,1]) as the CV coefficient. With λ=0 it degenerates to HT.
+  The sentence "the judge does no harm" in §16–19 must be restricted to **when λ is present**.
+- This fix is post LOCK v0.5, so it is not a confirmation; it is an item to verify after a lock on a third unused collection.
 
-### 21.5 λ-보정 문서 단위 CV (`weighted_cvl`, post-hoc) — J50 (ε=0.02, 판정 쌍; 같은 실행 안 비교)
+### 21.5 λ-corrected document-level CV (`weighted_cvl`, post-hoc) — J50 (ε=0.02, judged pairs; comparison within the same run)
 
-| collection | 판정자 | 가중 HT | CV(계수 1) | **CV(pilot λ)** |
+| collection | judge | weighted HT | CV (coefficient 1) | **CV (pilot λ)** |
 |---|---|---|---|---|
 | CAsT 2019 | 8B | 2,948 | 2,625 | 2,611 |
 | CAsT 2019 | reranker | 2,948 | 3,089 | 2,687 |
-| CAsT 2019 | 반전 | 2,948 | **3,362** | **2,720** |
+| CAsT 2019 | inverted | 2,948 | **3,362** | **2,720** |
 | dbpedia | 8B | 2,094 | 1,628 | 1,586 |
 | dbpedia | reranker | 2,094 | 1,710 | 1,637 |
-| dbpedia | 반전 | 2,094 | **2,388** | **2,024** |
+| dbpedia | inverted | 2,094 | **2,388** | **2,024** |
 
-pilot 회귀 λ(∈[0,1])를 CV 계수로 쓰면 적대적 판정자의 손실(+14–16%)이 사라지고 HT 수준으로 퇴화하며, 좋은 판정자에서는
-계수 1과 같거나 약간 낫다. 모든 셀 wrong 0. 실행 간 rng 잡음은 ±7%(가중 HT 2,750 vs 2,948). 이 결과는 lock 이후이므로
-세 번째 lock의 확증 항목이다. "판정자는 해가 없다"는 문서 단위 주장은 **λ-보정 CV에 한해** 유지한다.
+Using the pilot-regression λ (∈[0,1]) as the CV coefficient removes the loss from the adversarial judge (+14–16%) and degenerates to the HT level, while with good judges it is
+equal to or slightly better than coefficient 1. wrong 0 in every cell. Between-run rng noise is ±7% (weighted HT 2,750 vs 2,948). This result is post-lock, so
+it is a confirmation item for the third lock. The document-level claim "the judge does no harm" is retained **only for the λ-corrected CV**.
 
-## 22. LOCK v0.6 확증 평가 — ANTIQUE (200 query, pool/query 31.6, relevant = grade ≥ 3) — 2026-09-10
+## 22. LOCK v0.6 confirmatory evaluation — ANTIQUE (200 queries, pool/query 31.6, relevant = grade ≥ 3) — 2026-09-10
 
-판정자 Qwen3-8B: pair 정확도 **0.47**(UMBRELA 0–3 척도와 ANTIQUE 1–4 척도의 임계 불일치), 그러나 등급 상관 0.63, 정책 쌍 ρ 평균 **0.59**.
-"정확도는 판정자의 가치를 말해주지 않는다"의 가장 극단적인 사례.
+Judge Qwen3-8B: pair accuracy **0.47** (threshold mismatch between the UMBRELA 0–3 scale and the ANTIQUE 1–4 scale), yet grade correlation 0.63 and mean policy-pair ρ **0.59**.
+The most extreme case of "accuracy does not tell you the judge's value".
 
-### 22.1 사전 등록 기준 판정 (ε = 0.02, 최대 예산 150 query 상당 ≈ 1,900 판정 쌍, 300 draws)
+### 22.1 Pre-registered criteria verdict (ε = 0.02, maximum budget 150 query equivalents ≈ 1,900 judged pairs, 300 draws)
 
-| 기준 | 결과 |
+| criterion | result |
 |---|---|
-| P1 유효성 (경계 스트레스, 8B·반전) | **통과** — 1종 오류 최대 0.010 |
-| P2 가중 ≥ 1.5 × 균등 (최대 예산 ACT) | **미충족** — 0.96 vs 0.92: **천장 효과**(모든 arm이 최대 예산에서 포화). 병기 기준 J50은 776 vs 1,555 (0.50 ≤ 0.6) **통과** |
-| P3 λ-CV 무해성 (판정자 3종, 예산 ≥ 60 전 셀) | **통과** — J50: 8B 576, reranker 627, 반전 733 vs 가중 776 |
-| P4 반전 판정자에서 λ-CV ≥ 계수-1 CV | **통과** (전 셀). 계수-1 결함은 "최대 예산" 정의로는 재현 안 됨(천장), 예산 60에서는 재현(0.867 vs 가중 0.913, λ-CV 0.930) |
-| P5 잔차 능동 ≈ 가중+CV (최대 예산) | **통과** — 0.94 vs 0.94 |
-| S1 | ρ 0.59; 최대 예산 증분 0(천장), 예산 30에서 가중 0.28 → λ-CV 0.50 (+0.22), J50 −26% |
-| S2 query 단위 (8B, look 90) | split_t 111 / split_ppi **146** / split_auto 116 (/500), wrong 5–6/500 (≤ 0.012 < α) |
+| P1 validity (boundary stress, 8B·inverted) | **passed** — type I error at most 0.010 |
+| P2 weighted ≥ 1.5 × uniform (maximum-budget ACT) | **not met** — 0.96 vs 0.92: **ceiling effect** (all arms saturate at the maximum budget). The co-registered criterion J50 is 776 vs 1,555 (0.50 ≤ 0.6) **passed** |
+| P3 λ-CV harmlessness (3 judges, all cells with budget ≥ 60) | **passed** — J50: 8B 576, reranker 627, inverted 733 vs weighted 776 |
+| P4 λ-CV ≥ coefficient-1 CV with the inverted judge | **passed** (all cells). The coefficient-1 flaw does not reproduce under the "maximum budget" definition (ceiling), but reproduces at budget 60 (0.867 vs weighted 0.913, λ-CV 0.930) |
+| P5 residual active ≈ weighted+CV (maximum budget) | **passed** — 0.94 vs 0.94 |
+| S1 | ρ 0.59; maximum-budget increment 0 (ceiling); at budget 30, weighted 0.28 → λ-CV 0.50 (+0.22), J50 −26% |
+| S2 query level (8B, look 90) | split_t 111 / split_ppi **146** / split_auto 116 (/500), wrong 5–6/500 (≤ 0.012 < α) |
 
-**두 번째 lock 교훈.** v0.5는 예산 격자가 너무 작아 J50이 미정의였고, v0.6은 격자가 커서 최대 예산 ACT가 포화했다.
-항상 정의되는 기준은 **인간 단독 arm이 정보 구간(ACT 0.2–0.8)에 있는 예산에서** 평가해야 한다. 다음 lock부터는
-"P2: 균등 arm의 ACT가 [0.2, 0.8]에 드는 가장 작은 실행 예산에서 비교" 규칙을 쓴다.
+**Second lock lesson.** In v0.5 the budget grid was too small and J50 was undefined; in v0.6 the grid was large and the maximum-budget ACT saturated.
+An always-defined criterion must be evaluated **at a budget where the human-only arm is in the informative range (ACT 0.2–0.8)**. From the next lock on, we use the rule
+"P2: compare at the smallest executed budget at which the ACT of the uniform arm falls in [0.2, 0.8]".
 
-### 22.2 해석
-- 판정자 3종에서 λ-보정 CV는 어디서도 가중 표집보다 나쁘지 않았고(P3), 반전 판정자에서 계수-1 CV의 손실(예산 60, −0.05)을
-  λ-CV가 제거했다(P4). §21의 결함 수정이 새 데이터에서 확증됐다.
-- 결정 가중 표집의 이득(J50 절반)과 잔차 능동 추론과의 동등성(P5)도 재현됐다.
-- 정확도 0.47의 판정자가 ρ 0.59로 J50을 26% 줄였다: 판정자 임계 보정 없이도 CV가 작동한다(불편성·λ가 처리).
-- 세 사전 등록 평가의 유효성 통과는 이제 3/3, 효율의 사전 기준은 3/3 미충족(원인: 조건 미달, 격자 과소, 천장)이지만
-  J50 병기 기준은 v0.6에서 통과. 원고에는 이 전체를 그대로 쓴다.
+### 22.2 Interpretation
+- Across the 3 judges, λ-corrected CV was nowhere worse than weighted sampling (P3), and with the inverted judge, λ-CV removed the loss of coefficient-1 CV (budget 60, −0.05)
+  (P4). The flaw fix of §21 is confirmed on new data.
+- The gain of decision-weighted sampling (J50 halved) and the equivalence with residual active inference (P5) also replicated.
+- A judge with accuracy 0.47 reduced J50 by 26% with ρ 0.59: CV works even without judge threshold calibration (unbiasedness and λ handle it).
+- Validity has now passed 3/3 across the three pre-registered evaluations; the pre-specified efficiency criteria are 3/3 not met (causes: conditions unmet, grid too small, ceiling), but
+  the co-registered J50 criterion passed in v0.6. The manuscript reports all of this as is.
+## 15. Consistency check and preparation for strengthening the baselines (2026-09-17, featured-prep, after e6bbbad)
 
-## 15. 정합성 점검과 기준선 보강 준비 (2026-09-17, featured-prep, e6bbbad 이후)
+Goal restated: this paper is completed for **TMLR (Featured target)**; the ICML follow-up study is prepared separately after acceptance is confirmed. The question pushed as the core contribution is
+"when does an improvement in judge-assisted estimation translate into an actual reduction in human verification cost, when does it not, and can this be decided before the audit".
 
-목표 재확인: 이 논문은 **TMLR(Featured 목표)** 로 완성하고, ICML용 후속 연구는 게재 확정 후 별도로 준비한다. 핵심 기여로 미는 질문은
-"판정자를 활용한 추정의 개선이 언제 실제 인간 검증 비용 절감으로 이어지고, 언제 이어지지 않으며, 감사 전에 판단할 수 있는가".
-
-### 15.1 저장된 결과와 원고의 불일치 — 확인 결과 (모두 커밋된 CSV에서 재계산, `93_plot_F4.py`가 재생성)
-| 항목 | 원고(e6bbbad) | 현재 CSV | 조치 |
+### 15.1 Mismatches between stored results and the manuscript — findings (all recomputed from the committed CSVs; regenerated by `93_plot_F4.py`)
+| Item | Manuscript (e6bbbad) | Current CSV | Action |
 |---|---|---|---|
-| F4 54점 corr(gain, ρ) / corr(gain, acc), T=10 | 0.78 / −0.02 | **0.7549 / +0.0261** | 초록·기여·§3·F4 캡션 갱신. 원인: d678bc7→e6bbbad에서 legacy/modern/judged_rr CSV가 재실행(MC-MSE 열 추가)됐는데 본문 집계값은 이전 결과(0.7818/−0.0154)였음 |
-| 집단 내(collection×judge 14개) demeaned corr / 양수 집단 수 | 0.66 / 14개 전부 | 0.659 / **13개** (cqadupstack-android·rr −0.09: ρ −0.17~0.07, 이득 전부 <1) | "13 of 14"로 수정, 예외 명시 |
-| 판정자 교체(rr→llm)에서 ρ↑ 13건 중 이득↑ | 13/13 | 13/13 | 유지 |
-| 33점 MC-MSE gain corr / 추정-SE corr / 중앙값 차 | 0.78 / 0.83 / 0.03 | 0.7847 / 0.8306 / 0.034 | 유지 |
-| F6 "ρ≥0.55·N_unlab≥2T·ε≤0.02 모두 만족할 때만 >1.2, 그 외 0.9–1.05" | — | **반례**: ρ=0.641, N_unlab=100, ε=0.01, T=90 → 1.376; ρ=0.57·N=300·ε=0.02 → 1.11(<1.2); ρ≤0.39 범위 0.76–1.06 | 문단·캡션을 저장값 그대로 서술(§15.2) |
-| DL 21–23 rho_map 최대 비율 | "no cell shows a gain" | 1.045 | "no cell above 1.05" |
+| F4 54 points corr(gain, ρ) / corr(gain, acc), T=10 | 0.78 / −0.02 | **0.7549 / +0.0261** | Update abstract, contributions, §3, F4 caption. Cause: between d678bc7→e6bbbad the legacy/modern/judged_rr CSVs were re-run (MC-MSE column added) but the aggregate values in the text were from the previous results (0.7818/−0.0154) |
+| Within-group (14 collection×judge groups) demeaned corr / number of positive groups | 0.66 / all 14 | 0.659 / **13** (cqadupstack-android·rr −0.09: ρ −0.17~0.07, all gains <1) | Correct to "13 of 14", state the exception |
+| Judge swap (rr→llm): gain↑ among the 13 cases with ρ↑ | 13/13 | 13/13 | Keep |
+| 33 points MC-MSE gain corr / estimate-SE corr / median difference | 0.78 / 0.83 / 0.03 | 0.7847 / 0.8306 / 0.034 | Keep |
+| F6 ">1.2 only when ρ≥0.55·N_unlab≥2T·ε≤0.02 all hold, otherwise 0.9–1.05" | — | **Counterexamples**: ρ=0.641, N_unlab=100, ε=0.01, T=90 → 1.376; ρ=0.57·N=300·ε=0.02 → 1.11(<1.2); ρ≤0.39 range 0.76–1.06 | Describe paragraph and caption exactly as the stored values (§15.2) |
+| DL 21–23 rho_map maximum ratio | "no cell shows a gain" | 1.045 | "no cell above 1.05" |
 
-### 15.2 원고 수정 (main.tex, 재컴파일 확인)
-1. 초록을 약 620단어 → 약 420단어로 압축, 위 수치 동기화.
-2. **Prop. A**: 유한 N 형태로 재기술 — λ* = ρσ/(σ̂(1+n/N)), V_min = σ²/n·(1−ρ²/(1+n/N)), G = 1/(1−ρ²/(1+n/N)) → N/n→∞에서 1/(1−ρ²).
-   "PPI++를 이 문제에 적용한 기준식"으로 위치 지정. 세 가지 유보(λ 추정 오차, λ∈[0,1] clip으로 음의 ρ는 λ=0, 분산≠인증 사건) 명시. 부록 증명 동기화.
-3. **편향→ρ 설명 정정**: 상수 차등 편향 b_j−b_m은 ρ를 바꾸지 않고(D̂=D+0.1이면 ρ=1) CV가 정확히 제거. ρ를 낮추는 것은 query별로 변하는 오차와 그 공분산.
-   "평균 편향(판정자 단독 비교를 망침)"과 "예측 상관 손실(보정 후 효율을 낮춤)"을 분리. THEORY_v0.1.md 동일 수정.
-4. **Prop. B**: 불편성은 *고정된* 순서쌍 (j,m)에 대해서만 주장; 선택된 대비 (j, m̂_t)의 추정량은 불편하다고 주장하지 않음; 후보 선택은 고정 집합의 동시 coverage로 처리.
-   세 주장(고정 대비 불편성 / 선택 후 안전 인증 / 유한표본 수준)과 각각의 가정을 분리한 세 번째 remark 추가.
-5. **고정 예산 vs 순차 인증**: §2 효율 지표를 두 설계로 분리 정의(순차 query 단위: 누적 ACT; 고정 예산 문서 단위: L=1, α'=α/(M(M−1)), 예산별 인증 확률, J50 = 50% 도달 예산).
-   Table 2 캡션·§5.3 "Design" 문단·Limitations에 "사전 확정 예산의 비용이지 순차 정지 비용이 아님" 명시.
-6. **uniform 기준선의 혼합 효과**: uniform은 결정 가중치 0인 문서에도 라벨을 씀 → −40~−56%는 "불필요 문서 제외 + 가중 표집"의 합. §5.3에 명시하고
-   분리 기준선(`uniform_nz`)은 실행 후 행 추가(main.tex의 `% TODO(2026-09-17)`).
-7. **Exact bound 범위 서술**: 부록 E의 "paired precision difference에는 사전 범위가 없다" → 실험은 set-F1·범위 [−1,1] 사용; nested cutoff의 precision 차이는
-   ±(1−k_a/k_b)로 사전에 알 수 있음(k_a=10,k_b=20 → [−0.5,0.5]); set-F1은 n_G에 의존해 label-free가 아님. Table 6은 "이 bound·느슨한 범위"의 비용.
-8. **사전등록 서술**: 공개 이력의 초기 release 커밋에 lock과 결과가 함께 있으므로, 시점 증거는 날짜가 적힌 lock 문서와 개발 로그이며 self-reported임을 재현 노트에 명시.
-9. F4 그림을 현재 CSV로 재생성(`93_plot_F4.py`, `05_results/ppi_gain/F4_summary.json`).
+### 15.2 Manuscript revisions (main.tex, recompilation verified)
+1. Abstract compressed from about 620 words → about 420 words; the numbers above synchronized.
+2. **Prop. A**: restated in finite-N form — λ* = ρσ/(σ̂(1+n/N)), V_min = σ²/n·(1−ρ²/(1+n/N)), G = 1/(1−ρ²/(1+n/N)) → 1/(1−ρ²) as N/n→∞.
+   Positioned as "the baseline formula obtained by applying PPI++ to this problem". Three caveats stated (λ estimation error; with the λ∈[0,1] clip, negative ρ gives λ=0; variance ≠ certification event). Appendix proof synchronized.
+3. **Correction of the bias→ρ explanation**: a constant differential bias b_j−b_m does not change ρ (if D̂=D+0.1 then ρ=1) and the CV removes it exactly. What lowers ρ is the per-query varying error and its covariance.
+   Separated "mean bias (which ruins judge-only comparison)" from "loss of predictive correlation (which lowers efficiency after correction)". Same fix in THEORY_v0.1.md.
+4. **Prop. B**: unbiasedness is claimed only for a *fixed* ordered pair (j,m); the estimator of the selected contrast (j, m̂_t) is not claimed to be unbiased; candidate selection is handled by simultaneous coverage over the fixed set.
+   Added a third remark separating the three claims (unbiasedness for fixed contrasts / safe certification after selection / finite-sample level) and the assumptions of each.
+5. **Fixed budget vs sequential certification**: the efficiency metric of §2 is defined separately for the two designs (sequential, per query: cumulative ACT; fixed budget, per document: L=1, α'=α/(M(M−1)), certification probability per budget, J50 = budget at which 50% is reached).
+   Table 2 caption, §5.3 "Design" paragraph, and Limitations state "this is the cost of a pre-fixed budget, not the cost of sequential stopping".
+6. **Mixed effect of the uniform baseline**: uniform spends labels even on documents with decision weight 0 → the −40~−56% is the sum of "excluding unnecessary documents + weighted sampling". Stated in §5.3, and
+   the separating baseline (`uniform_nz`) row is added after it is run (`% TODO(2026-09-17)` in main.tex).
+7. **Description of the exact-bound range**: Appendix E's "the paired precision difference has no a priori range" → the experiments use set-F1 and range [−1,1]; the precision difference for nested cutoffs is
+   known in advance as ±(1−k_a/k_b) (k_a=10,k_b=20 → [−0.5,0.5]); set-F1 depends on n_G and is therefore not label-free. Table 6 is the cost of "this bound with the loose range".
+8. **Pre-registration statement**: since the initial release commit of the public history contains the lock and the results together, the timing evidence is the dated lock document and the development log, and the reproducibility note states that this is self-reported.
+9. F4 figure regenerated from the current CSVs (`93_plot_F4.py`, `05_results/ppi_gain/F4_summary.json`).
 
-### 15.3 코드 (실행은 pools bundle이 있는 GPU 머신에서)
-- `81_sampling_baselines.py`: arm **`uniform_nz`** 추가 — 결정 가중치가 어느 비교에서든 0이 아닌 문서(공유 표집이면 비교별 support의 합집합) 안에서 균등 표집.
-  `--dump_draws`로 (draw, arm)별 고유 라벨 비용·인증 결과를 `*_draws.csv`에 기록. 합성 pool 스모크 테스트 통과(arm 순서: uniform, uniform_nz, weighted, …).
-- `86_table2_v2.py`: `uniform_nz` 행("Uniform over decision-relevant documents (humans)"), 없는 행은 건너뜀. `84_unify_metrics.py`에도 추가.
-- `94_j50_ci.py`: `*_draws.csv`에서 draw 인덱스를 (예산별로) 재표집하되 모든 arm에 같은 인덱스를 적용해 pairing을 유지, J50과 절감률
-  (uniform→uniform_nz, uniform_nz→weighted, uniform→weighted, weighted→weighted_cvl 등)의 부트스트랩 95% 구간·MC SE 출력 → `05_results/unified/J50_CI_eps*.csv`.
-- 재실행 명령(v3 격자와 동일, `_v3b{B}` 태그 규약): `RUN_REVISED_ACCOUNTING.sh`의 81 호출에 `--dump_draws`를 붙여 예산별로 실행한 뒤
+### 15.3 Code (runs on the GPU machine that has the pools bundle)
+- `81_sampling_baselines.py`: arm **`uniform_nz`** added — uniform sampling within the documents whose decision weight is nonzero in any comparison (for shared sampling, the union of the per-comparison supports).
+  `--dump_draws` records the unique label cost and certification outcome per (draw, arm) in `*_draws.csv`. Synthetic-pool smoke test passed (arm order: uniform, uniform_nz, weighted, …).
+- `86_table2_v2.py`: `uniform_nz` row ("Uniform over decision-relevant documents (humans)"); missing rows are skipped. Also added to `84_unify_metrics.py`.
+- `94_j50_ci.py`: resamples draw indices (per budget) from `*_draws.csv` but applies the same indices to all arms to keep the pairing; outputs bootstrap 95% intervals and MC SE of J50 and of the savings
+  (uniform→uniform_nz, uniform_nz→weighted, uniform→weighted, weighted→weighted_cvl, etc.) → `05_results/unified/J50_CI_eps*.csv`.
+- Re-run command (same as the v3 grid, `_v3b{B}` tag convention): add `--dump_draws` to the 81 call in `RUN_REVISED_ACCOUNTING.sh`, run per budget, then
   `python3 86_table2_v2.py v3 && python3 94_j50_ci.py --eps 0.02 && python3 94_j50_ci.py --eps 0.01`.
-  판독 기준: uniform→uniform_nz가 절감의 대부분이면 "가중치"보다 "결정 관련 문서 식별"이 기여의 중심; uniform_nz→weighted가 크면 |w| 비례 표집 자체의 가치.
+  Reading criterion: if uniform→uniform_nz accounts for most of the savings, the center of the contribution is "identifying decision-relevant documents" rather than "weights"; if uniform_nz→weighted is large, that is the value of |w|-proportional sampling itself.
 
-### 15.4 다음 단계 (Featured를 가르는 부분)
-- 3단계: pilot·후보 선택·slack 분석을 "감사 전 판단 규칙"(입력: pilot의 ρ 추정, N_unlab, pilot 비용, 추정 margin, bound 종류 → 출력: judge CV / 인간 단독 가중 표집 / 복잡한 배분 중 선택)으로
-  묶고, 고정한 예측을 별도 collection에서 검증. 기존 PPI·active inference 문헌이 이미 제공하는 판단과 대조하는 것이 선행.
+### 15.4 Next steps (the part that decides Featured)
+- Stage 3: bundle pilot, candidate selection and slack analysis into a "pre-audit decision rule" (inputs: pilot ρ estimate, N_unlab, pilot cost, estimated margin, bound type → output: choice among judge CV / human-only weighted sampling / complex allocation), and
+  validate the locked predictions on a separate collection. Contrasting with the decisions that the existing PPI and active-inference literature already provides comes first.
 
-## 16. Track C — 인증 비용을 사전에 설명·예측하는 규칙 (2026-09-17, 저장된 결과만으로 수행)
+## 16. Track C — A rule that explains and predicts certification cost in advance (2026-09-17, performed with stored results only)
 
-질문: "판정자(또는 어떤 표집 설계)가 추정 분산을 줄이면 그것이 실제 인증 비용 절감으로 얼마나 번역되는가? 감사 전에 알 수 있는가?"
+Question: "When a judge (or any sampling design) reduces estimation variance, how much of that translates into actual certification cost savings? Can it be known before the audit?"
 
-### 16.1 분산 희석(variance-dilution) 비용 모델 — `95_cost_model.py`, `05_results/unified/COST_MODEL_*.csv`, F8
-모델. 모집단 estimand에서 비-pilot query를 전부 감사하면(J50 도달 예산에서는 f=1) bound의 분산은 mean_q(v_q)/n이고, π ∝ base인 Poisson 표집에서
-v_q ∝ 1/b(query당 문서 수). 따라서 분산 ∝ v_arm / L_post (L_post = pilot 이후 라벨 수)이고 인증은 z·sqrt(v_arm/L_post) ≤ slack에서 일어난다.
-같은 pilot·후보·slack을 공유하는 두 arm에 대해
-    (J50_a − P)/(J50_b − P) ≈ v_a/v_b,   총 절감 = 1 − J50_a/J50_b = (1 − v_a/v_b) · (1 − P/J50_b)  [분산 감소 × pilot 이후 비중].
-v는 저장된 `var_est`(query당 추정치 분산)의 최소 예산 3개 평균(b=4, within-query 표집 분산이 지배)에서 읽는다.
+### 16.1 Variance-dilution cost model — `95_cost_model.py`, `05_results/unified/COST_MODEL_*.csv`, F8
+Model. Under the population estimand, if all non-pilot queries are audited (f=1 at the budget where J50 is reached), the variance of the bound is mean_q(v_q)/n, and under Poisson sampling with π ∝ base,
+v_q ∝ 1/b (documents per query). Hence variance ∝ v_arm / L_post (L_post = number of labels after the pilot) and certification occurs when z·sqrt(v_arm/L_post) ≤ slack.
+For two arms sharing the same pilot, candidates and slack,
+    (J50_a − P)/(J50_b − P) ≈ v_a/v_b,   total saving = 1 − J50_a/J50_b = (1 − v_a/v_b) · (1 − P/J50_b)  [variance reduction × post-pilot share].
+v is read from the stored `var_est` (per-query estimator variance) averaged over the 3 smallest budgets (b=4, dominated by within-query sampling variance).
 
-검증(Table 2·4의 175개 (collection, judge, ε, arm) 셀, 기준 arm = weighted):
-- corr(log 비용비, log 분산비) = **0.947**, 중앙값 배율 오차 1.10×, 90분위 1.35×.
-- 판정자 arm의 총 절감: corr(예측, 실측) = 0.83, MAE 0.06 (총 J50 단위). λ-CV arm 18셀 중 9셀이 ±0.02, DBpedia ε=0.01(예측 0.19–0.21, 실측 0.07–0.10) 외에는 ±0.05 이내.
-- arm별 중앙값 |log 오차|: weighted_cv 0.06, weighted_cvl 0.08, ai_resid 0.06, robust 0.08–0.10, strat 0.05, uniform 0.09, ai_calib 0.11, **active_judge/active_cv 0.22–0.26**
-  (|w|·sqrt(ĵ(1−ĵ)) 표집은 π가 1에서 포화해 분산이 1/b보다 빨리 떨어지므로 소예산 분산비가 비용비를 과대예측).
-- collection별: ANTIQUE 0.08, DBpedia 0.09, DL 0.08, CAsT 0.17.
-- pilot 이후 비중(1 − P/J50_w) 0.22–0.71 → 같은 분산 감소(≈30%)가 DL에서는 3%, CAsT·DBpedia에서는 19–20%의 총 절감으로 나타나는 이유가 정확히 이 곱셈.
+Validation (175 (collection, judge, ε, arm) cells of Tables 2 and 4, reference arm = weighted):
+- corr(log cost ratio, log variance ratio) = **0.947**, median multiplicative error 1.10×, 90th percentile 1.35×.
+- Total saving of the judge arms: corr(predicted, observed) = 0.83, MAE 0.06 (in total-J50 units). 9 of the 18 λ-CV arm cells are within ±0.02; all within ±0.05 except DBpedia ε=0.01 (predicted 0.19–0.21, observed 0.07–0.10).
+- Median |log error| per arm: weighted_cv 0.06, weighted_cvl 0.08, ai_resid 0.06, robust 0.08–0.10, strat 0.05, uniform 0.09, ai_calib 0.11, **active_judge/active_cv 0.22–0.26**
+  (under |w|·sqrt(ĵ(1−ĵ)) sampling, π saturates at 1 so the variance falls faster than 1/b, and the small-budget variance ratio over-predicts the cost ratio).
+- Per collection: ANTIQUE 0.08, DBpedia 0.09, DL 0.08, CAsT 0.17.
+- Post-pilot share (1 − P/J50_w) 0.22–0.71 → this product is exactly why the same variance reduction (≈30%) shows up as a 3% total saving on DL but 19–20% on CAsT and DBpedia.
 
-판독: **Table 2의 판정자 증분은 "판정자가 만든 분산 감소 × pilot 이후 라벨 비중"으로 완전히 설명된다.** 두 인자는 모두 pilot만으로 계산 가능하다
-(pilot query의 라벨은 모두 알므로 각 설계의 within-query HT 분산을 그대로 계산; pilot 이후 비중은 pilot slack으로부터 L_post = z²·b_ref·v_w/ŝ²).
+Reading: **the judge increment in Table 2 is fully explained by "variance reduction produced by the judge × post-pilot label share".** Both factors are computable from the pilot alone
+(all labels of the pilot queries are known, so the within-query HT variance of each design is computed directly; the post-pilot share comes from the pilot slack via L_post = z²·b_ref·v_w/ŝ²).
 
-메뉴 배분(83, 29셀)에는 같은 모델이 **실패**한다: 실현 design objective(max_j V_j/s_j²) 비 vs pilot 이후 비용비 corr = 0.53.
-oracle의 objective는 static 대비 1.5–2.2× (CAsT ε=0.01은 13×) 좋지만 비용은 0.79–1.00; plug-in의 objective는 7셀 중 6셀에서 2–14× *나쁘지만* 비용은 0.83–1.24.
-원인: draw 평균 objective는 slack이 가장 작은(어떤 설계로도 인증 안 되는) draw가 지배하고, J50은 중앙 draw가 결정한다. 원고 §7(2)·부록 D의
-"threshold event" 설명을 정량화한 것. → **"좋은 추정 ≠ 좋은 인증"의 정확한 위치는 분산-비용 번역이 아니라 (a) pilot 희석과 (b) 목적함수가
-인증 불가능한 draw에 지배되는 것**이다.
+For menu allocation (83, 29 cells) the same model **fails**: corr between the ratio of realized design objective (max_j V_j/s_j²) and the post-pilot cost ratio = 0.53.
+The oracle's objective is 1.5–2.2× better than static (13× for CAsT ε=0.01) but its cost is 0.79–1.00; the plug-in's objective is 2–14× *worse* in 6 of 7 cells but its cost is 0.83–1.24.
+Cause: the draw-averaged objective is dominated by the draws with the smallest slack (which no design certifies), while J50 is determined by the median draw. This quantifies the
+"threshold event" explanation of manuscript §7(2) and Appendix D. → **The exact location of "good estimation ≠ good certification" is not the variance-to-cost translation but (a) pilot dilution and (b) the objective being
+dominated by uncertifiable draws**.
 
-원고 반영: §5.3 "A cost model that reproduces the table" 문단, §7(2) 한 문장, 부록 F(`app:costmodel`) + F8. (22쪽)
+Manuscript: §5.3 paragraph "A cost model that reproduces the table", one sentence in §7(2), Appendix F (`app:costmodel`) + F8. (22 pages)
 
-### 16.2 문헌 대조 (이 결과가 기존에 없는가)
-- Mani et al. 2025 (No Free Lunch): PPI++가 인간 단독보다 나아지는 유한표본 조건 |ρ| ≳ 1/√(n/2−2) (cross-fit). n=45 검증 반쪽이면 ≈0.22.
-  우리 map은 ρ=0.39에서도 인증 이득이 없다 → **추정 효율의 문턱이 아니라 인증 사건의 문턱**이 지배적. 이 차이를 16.3의 계산기가 정량화해야 한다.
-- Zrnic & Candès 2024, Li et al. 2025, Sfyraki & Wang 2026: 분산 최적 표집·안전 혼합·단순 표집의 경쟁력. 분산까지의 결과. "분산 → 인증 비용" 번역과
-  pilot 희석, 사전 예측 규칙은 다루지 않음.
-- Ochoa Rivera & Tewari 2024 (thresholding linear bandit), Fiez et al. 2019: 메뉴 인증의 배분은 이 틀로 환원 가능하나, 그 문헌의 목적함수도
-  slack-가중 분산이므로 16.1의 "objective가 인증 불가능 draw에 지배" 현상은 그쪽에서도 실무적 함의를 가진다(주장은 우리 데이터 범위로 한정).
-→ 기여 문장 후보: "판정자·표집 설계의 가치는 (분산 감소) × (pilot 이후 비중)으로 pilot에서 사전 계산되며, 이 규칙이 [검증 결과]를 맞힌다."
+### 16.2 Literature comparison (is this result absent from prior work)
+- Mani et al. 2025 (No Free Lunch): finite-sample condition under which PPI++ beats human-only, |ρ| ≳ 1/√(n/2−2) (cross-fit). With an n=45 validation half this is ≈0.22.
+  Our map shows no certification gain even at ρ=0.39 → **the threshold of the certification event, not the threshold of estimation efficiency**, dominates. The calculator of 16.3 must quantify this difference.
+- Zrnic & Candès 2024, Li et al. 2025, Sfyraki & Wang 2026: variance-optimal sampling, safe mixing, competitiveness of simple sampling. Results up to the variance. The "variance → certification cost" translation,
+  pilot dilution and a pre-audit prediction rule are not treated.
+- Ochoa Rivera & Tewari 2024 (thresholding linear bandit), Fiez et al. 2019: menu-certification allocation reduces to this framework, but since that literature's objective is also
+  slack-weighted variance, the phenomenon of 16.1 "the objective is dominated by uncertifiable draws" has practical implications there too (claim restricted to the range of our data).
+→ Candidate contribution sentence: "The value of a judge or sampling design is pre-computed from the pilot as (variance reduction) × (post-pilot share), and this rule correctly predicts [validation results]."
 
-### 16.3 질의 단위 mechanism map 계산기 — `96_ppi_calculator.py`, `05_results/rho_map/CALCULATOR_vs_map.csv`, F9
-설정: 저장소의 인증 코드(pick_candidate, ucb_t, ucb_ppi, cross-fit λ∈[0,1], 순서쌍 6개 Bonferroni)를 그대로, 정책 utility 3개를 가우시안으로 생성
-(쌍별 차이 분산 = ppi_gain의 se_human·√10, 평균 = 모집단 gap, 판정자 쌍별 ρ = 모집단 ρ × 잡음 수준별 감쇠). 셀당 1,000회, T=90.
-| | DBpedia (64셀) | DL 21–23 (32셀) |
+### 16.3 Query-level mechanism-map calculator — `96_ppi_calculator.py`, `05_results/rho_map/CALCULATOR_vs_map.csv`, F9
+Setup: the repository's certification code as is (pick_candidate, ucb_t, ucb_ppi, cross-fit λ∈[0,1], Bonferroni over 6 ordered pairs); the 3 policy utilities generated as Gaussians
+(pairwise difference variance = ppi_gain's se_human·√10, mean = population gap, judge pairwise ρ = population ρ × attenuation per noise level). 1,000 runs per cell, T=90.
+| | DBpedia (64 cells) | DL 21–23 (32 cells) |
 |---|---|---|
-| 인간 단독 ACT corr(sim, map) / MAE | 0.994 / 0.087 (작은 ε에서 가우시안이 과소) | 0.981 / 0.024 |
-| ACT 비율, cross-fit λ: corr / MAE / >1.2 일치율 | **0.854 / 0.055 / 0.92** (sim 7셀 > 1.2 vs map 12셀: 약간 보수적) | 0.735 / 0.028 / 1.00 (손실 0.88–0.97 재현) |
-| 모집단 최적 λ(추정 잡음 없음) | 0.871 / 0.060 / 0.94 | **0.12 / 0.050** — 손실이 사라짐(모두 ≥0.99) |
-| clip 제거 | 0.840 / 0.067 | 0.09 / 0.052 |
-| finite-N λ (÷(1+n/N)) | 0.811 / 0.073 / 0.89 — N_unlab=50에서 1.2를 예측(실측 0.95–0.98) | 0.05 / 0.055 |
-판독: (1) F6는 (ρ, σ, gap, n, N_unlab, ε)로 계산 가능하다. (2) 나쁜 판정자에서의 always-PPI 손실은 **λ 추정 잡음**(22-query fold)의 비용이며 판정자 자체의
-성질이 아니다. (3) finite-N λ 공식은 계수가 알려졌다는 가정이라 추정 시에는 잘못된 보정. (4) No Free Lunch의 추정 문턱(≈0.22)보다 훨씬 높은 ρ가
-필요한 이유는 인증이 threshold event이기 때문 — ρ=0.39에서 분산 이득 ≤1.18이 n/N 희석 후 ACT를 거의 못 움직인다.
-원고 반영: §3 map 문단 끝 + 부록 G(`app:calculator`) + F9. 남은 일: pilot 추정치(ρ̂ BCa, σ̂, ĝap)를 입력으로 넣었을 때의 정확도 — 97과 같은 방식으로
-draw별 예측 vs 실측(63 planner에 --dump 옵션 필요, pools 필요).
+| Human-only ACT corr(sim, map) / MAE | 0.994 / 0.087 (Gaussian underestimates at small ε) | 0.981 / 0.024 |
+| ACT ratio, cross-fit λ: corr / MAE / agreement rate on >1.2 | **0.854 / 0.055 / 0.92** (sim 7 cells > 1.2 vs map 12 cells: slightly conservative) | 0.735 / 0.028 / 1.00 (losses 0.88–0.97 reproduced) |
+| Population-optimal λ (no estimation noise) | 0.871 / 0.060 / 0.94 | **0.12 / 0.050** — the loss disappears (all ≥0.99) |
+| Clip removed | 0.840 / 0.067 | 0.09 / 0.052 |
+| finite-N λ (÷(1+n/N)) | 0.811 / 0.073 / 0.89 — predicts 1.2 at N_unlab=50 (observed 0.95–0.98) | 0.05 / 0.055 |
+Reading: (1) F6 is computable from (ρ, σ, gap, n, N_unlab, ε). (2) The always-PPI loss under a bad judge is the cost of **λ estimation noise** (22-query fold), not a property of the judge
+itself. (3) The finite-N λ formula assumes the coefficients are known, so it is the wrong correction when they are estimated. (4) The reason a much higher ρ than the No Free Lunch estimation threshold (≈0.22) is
+needed is that certification is a threshold event — at ρ=0.39 the variance gain ≤1.18 barely moves ACT after n/N dilution.
+Manuscript: end of the §3 map paragraph + Appendix G (`app:calculator`) + F9. Remaining: accuracy when pilot estimates (ρ̂ BCa, σ̂, ĝap) are given as input — per-draw predicted vs observed in the same way as 97
+(63 planner needs a --dump option; pools required).
 
-### 16.4 사전 판단 규칙의 검증 절차 — `97_pilot_rule.py` (pools 필요)
-`81 --dump_draws`가 draw별로 기록하는 v_pilot(각 arm의 pilot 기반 within-query 분산, b_ref=4), slack_pilot, slack_true를 사용.
-- 예측 1(arm 순위): v_pilot 비 → pilot 이후 비용비. 예측 2(총 절감): (1 − v비) × 예측 비중, 비중은 L_post_pred = z²·b_ref·v_w/ŝ².
-- 판단: "판정자 CV 사용 권고 iff 예측 절감 > τ(=0.05)" 를 draw별로 내리고 셀 실측 J50과 대조(정확도, 오권고, 누락).
-- 검증 설계: 개발 4 collection에서 규칙을 고정 → 새 collection 1개(후보: TREC DL 2019/2020 fully judged pool, 또는 Touché/COVID를 문서 단위로)에
-  **실행 전 예측을 기록**(pilot 20 query만 사용) → 실측과 대조. 이것이 Featured 주장의 핵심 실험.
+### 16.4 Validation procedure for the pre-audit decision rule — `97_pilot_rule.py` (pools required)
+Uses v_pilot (each arm's pilot-based within-query variance, b_ref=4), slack_pilot and slack_true, recorded per draw by `81 --dump_draws`.
+- Prediction 1 (arm ranking): v_pilot ratio → post-pilot cost ratio. Prediction 2 (total saving): (1 − v ratio) × predicted share, with share from L_post_pred = z²·b_ref·v_w/ŝ².
+- Decision: "recommend judge CV iff predicted saving > τ(=0.05)" made per draw and compared with the cell's observed J50 (accuracy, wrong recommendations, misses).
+- Validation design: fix the rule on the 4 development collections → on 1 new collection (candidates: TREC DL 2019/2020 fully judged pool, or Touché/COVID at the document level)
+  **record the predictions before running** (using only the 20 pilot queries) → compare with the observed values. This is the central experiment of the Featured claim.
 
-### 16.5 GPU 머신에서 실행할 것 — `04_code/RUN_TRACK_C.sh`
-v3 격자 그대로 81을 `--dump_draws`로 재실행(`uniform_nz`는 별도 rng 스트림이라 기존 arm 수치는 정확히 재현) → `86 v3`, `95`, `94`, `97`.
-판독 순서: (1) uniform→uniform_nz→weighted 분해, (2) 절감률의 부트스트랩 구간, (3) pilot 규칙의 정확도(셀 18개). 규칙이 맞으면 §16.4의 held-out 검증으로.
+### 16.5 To run on the GPU machine — `04_code/RUN_TRACK_C.sh`
+Re-run 81 with `--dump_draws` on the v3 grid as is (`uniform_nz` uses a separate rng stream, so the existing arm numbers are reproduced exactly) → `86 v3`, `95`, `94`, `97`.
+Reading order: (1) uniform→uniform_nz→weighted decomposition, (2) bootstrap intervals of the savings, (3) accuracy of the pilot rule (18 cells). If the rule holds, proceed to the held-out validation of §16.4.
 
 
-### 16.6 Track C 실행 결과 (2026-09-17, 이 머신: RTX 3090, cgroup 31코어; `RUN_TRACK_C.sh`, 84 프로세스 8분)
-실행 메모: 처음에는 84개를 동시에 띄웠더니 프로세스당 BLAS 스레드 158개 × 84 = 13k 스레드가 31코어 쿼터에서 뒤엉켜 1.7시간 동안 셀 하나도 끝나지 않았다.
-`OMP_NUM_THREADS=1` + 동시 31개로 재시작하니 전체가 8분. 스크립트에 반영. 기존 arm 1,176행은 커밋본과 **정확히 동일**(uniform_nz는 별도 rng).
+### 16.6 Track C execution results (2026-09-17, this machine: RTX 3090, cgroup 31 cores; `RUN_TRACK_C.sh`, 84 processes in 8 minutes)
+Execution note: launching all 84 at once initially gave 158 BLAS threads per process × 84 = 13k threads tangled under the 31-core quota, and not a single cell finished in 1.7 hours.
+Restarting with `OMP_NUM_THREADS=1` + 31 concurrent took 8 minutes in total. Reflected in the script. The 1,176 rows of the existing arms are **exactly identical** to the committed version (uniform_nz uses a separate rng).
 
-**(1) 절감 분해 (ε=0.02, paired bootstrap 95%, 300 draws)** — `05_results/unified/J50_CI_eps0.02.csv`
+**(1) Savings decomposition (ε=0.02, paired bootstrap 95%, 300 draws)** — `05_results/unified/J50_CI_eps0.02.csv`
 | collection | uniform→uniform_nz | uniform_nz→weighted | uniform→weighted | J50: uniform / nz / weighted |
 |---|---|---|---|---|
 | ANTIQUE | 21% [16,26] | 25% [21,28] | 40% [37,44] | 1,405 / 1,107 / 836 |
 | CAsT | 41% [36,45] | 25% [20,30] | 56% [52,59] | 4,778 / 2,823 / 2,127 |
 | DBpedia | 39% [22,45] | 25% [18,33] | 54% [42,58] | 5,563 / 3,372 / 2,543 |
 | DL 21–23 | 36% [31,39] | 32% [29,36] | 56% [53,58] | 4,092 / 2,613 / 1,783 |
-판독: 둘 다 필요. "결정 무관 문서 제외"가 총 절감의 절반(ANTIQUE)~2/3–3/4(나머지), |w| 가중이 나머지. ε=0.01: nz→weighted 20–39%, uniform→nz 23–30%(uniform 도달 셀만).
+Reading: both are needed. "Excluding decision-irrelevant documents" is half (ANTIQUE) to 2/3–3/4 (the others) of the total saving; |w| weighting is the rest. ε=0.01: nz→weighted 20–39%, uniform→nz 23–30% (only cells where uniform reaches).
 
-**(2) 판정자 증분의 구간 (weighted→weighted_cvl, ε=0.02)**: ANTIQUE Qwen 7.8 [5.1,10.5], rr 7.6 [5.1,10.3], inv 1.6 [−1.8,4.1]; CAsT Qwen 19.1 [13.5,23.8], rr 13.6 [8.5,18.6], inv 4.8 [−0.7,8.7];
-DBpedia Qwen 19.5 [12.6,26.9], rr 19.4 [12.3,26.7]; DL Qwen 3.4 [1.0,6.3]. 실제 판정자는 전부 0을 배제(DL은 아슬아슬), 반전 판정자는 0 포함.
-coef-1 CV + inv on ANTIQUE: −5.1 [−8.8,−1.6] → 진짜 손실; λ-fit이 제거(1.6 [−1.8,4.1]).
+**(2) Intervals of the judge increment (weighted→weighted_cvl, ε=0.02)**: ANTIQUE Qwen 7.8 [5.1,10.5], rr 7.6 [5.1,10.3], inv 1.6 [−1.8,4.1]; CAsT Qwen 19.1 [13.5,23.8], rr 13.6 [8.5,18.6], inv 4.8 [−0.7,8.7];
+DBpedia Qwen 19.5 [12.6,26.9], rr 19.4 [12.3,26.7]; DL Qwen 3.4 [1.0,6.3]. All real judges exclude 0 (DL barely); the inverted judge includes 0.
+coef-1 CV + inv on ANTIQUE: −5.1 [−8.8,−1.6] → a genuine loss; the λ-fit removes it (1.6 [−1.8,4.1]).
 
-**(3) 사전 판단 규칙 (`97_pilot_rule.py`, 판정자 arm 18셀)**
+**(3) Pre-audit decision rule (`97_pilot_rule.py`, 18 judge-arm cells)**
 | | ε=0.02 | ε=0.01 |
 |---|---|---|
-| corr(pilot 분산비, 실측 pilot 이후 비용비) | 0.95 | 0.90 |
-| 완전 pilot 기반 총 절감 예측: corr / MAE | 0.88 / **0.034** | 0.89 / 0.057 |
-| 판단 "절감 > 5%" (pilot 과반) 정확도 | 15/18 (오권고 2, 누락 1) | 14/18 (오권고 3, 누락 1) |
-| λ-CV vs coef-1 CV 순위 | 9/9 | 8/9 |
-틀린 셀은 dbpedia/rr/coef-1 CV(ε=0.01, 예측 0.06, 실측 −0.01) 하나를 빼면 모두 실측 절감이 0.03–0.06으로 문턱 5% 근처. 반전 판정자는 한 번도 권고하지 않음.
-약한 인자는 pilot 이후 비중: L_post 예측(z²·b·v_w/ŝ²) 중앙값 186/828/793/659 vs 실측 205/1152/1514/397 — 2배 이내. → 규칙은 "판정자를 쓸지·어느 설계인지"에는 신뢰할 만하고 "얼마나"에는 거칠다.
+| corr(pilot variance ratio, observed post-pilot cost ratio) | 0.95 | 0.90 |
+| Fully pilot-based total saving prediction: corr / MAE | 0.88 / **0.034** | 0.89 / 0.057 |
+| Decision "saving > 5%" (pilot majority) accuracy | 15/18 (2 wrong recommendations, 1 miss) | 14/18 (3 wrong recommendations, 1 miss) |
+| λ-CV vs coef-1 CV ranking | 9/9 | 8/9 |
+Except for one wrong cell, dbpedia/rr/coef-1 CV (ε=0.01, predicted 0.06, observed −0.01), all wrong cells have observed savings of 0.03–0.06, near the 5% threshold. The inverted judge is never recommended.
+The weak factor is the post-pilot share: predicted L_post (z²·b·v_w/ŝ²) medians 186/828/793/659 vs observed 205/1152/1514/397 — within a factor of 2. → The rule is reliable for "whether to use the judge and which design" and rough for "how much".
 
-원고 반영: Table 2·4에 uniform_nz 행, §5.3 분해 문단·구간·"predictable from the pilot" 문단, 초록·기여 3·Limitations·부록 F 갱신. TODO 0개. F7 v3 재생성.
+Manuscript: uniform_nz rows in Tables 2 and 4, §5.3 decomposition paragraph, intervals, and "predictable from the pilot" paragraph; abstract, contribution 3, Limitations, Appendix F updated. 0 TODOs. F7 v3 regenerated.
 
-### 16.7 다음: held-out 검증 (Featured의 핵심 실험)
-개발 4 collection에서 규칙(τ=5%, b_ref=4, 과반 pilot)을 고정했으므로, 새 collection에서 **실행 전에** 예측을 기록하고 실측과 대조한다.
-후보: TREC DL 2019/2020 fully judged pool(번들의 trecdl stack에 _llm 판정이 있는지 확인 필요), Touché 2020·TREC-COVID(judged stack; _llm 파일 없음 → 66으로 Qwen3-8B 판정 생성 필요, GPU 있음).
-절차: (a) pilot 20 query만으로 v_pilot·slack 계산 → 예측 파일 커밋(해시 고정), (b) 81 전체 실행, (c) 97로 채점. 예측 자체가 코드로 결정되므로 "사전 등록"은 예측 파일의 커밋 시점으로 증명.
+### 16.7 Next: held-out validation (the central experiment for Featured)
+Since the rule (τ=5%, b_ref=4, pilot majority) has been fixed on the 4 development collections, record the predictions on a new collection **before running** and compare with the observed values.
+Candidates: TREC DL 2019/2020 fully judged pool (need to check whether the bundle's trecdl stack has _llm judgments), Touché 2020·TREC-COVID (judged stack; no _llm file → need to generate Qwen3-8B judgments with 66, GPU available).
+Procedure: (a) compute v_pilot and slack from the 20 pilot queries only → commit the prediction file (hash fixed), (b) run 81 in full, (c) score with 97. Since the prediction itself is determined by code, "pre-registration" is proven by the commit time of the prediction file.
 
-### 16.8 Held-out 검증 1차 — TREC-COVID(50 query)·Touché 2020(49 query), reranker 판정자 (2026-09-17)
-프로토콜: `81 --predict_only`로 pilot 기록만 생성 → `98_heldout_predict.py`로 예측 고정·커밋(54deba0; 수정본 9ca0f6b) → 감사(300 draws, 예산 2–45) → `97`로 채점.
-예측 기록과 감사의 pilot 열은 정확히 일치(차이 0). 첫 lock의 98에 slack 제곱 누락 버그가 있었고(L_post만 영향), LOCK_NOTE.md에 공개.
-결과 파일: `05_results/heldout/PILOT_RULE_rr_{ho,ho10}_eps*.csv`, `PREDICTIONS_rr*.md`.
+### 16.8 Held-out validation round 1 — TREC-COVID (50 queries)·Touché 2020 (49 queries), reranker judge (2026-09-17)
+Protocol: generate only the pilot record with `81 --predict_only` → fix and commit the predictions with `98_heldout_predict.py` (54deba0; corrected version 9ca0f6b) → audit (300 draws, budgets 2–45) → score with `97`.
+The pilot columns of the prediction record and the audit match exactly (difference 0). The first lock's 98 had a bug omitting the square of the slack (affects L_post only), disclosed in LOCK_NOTE.md.
+Result files: `05_results/heldout/PILOT_RULE_rr_{ho,ho10}_eps*.csv`, `PREDICTIONS_rr*.md`.
 
-**(1) 사전 고정 예측 중 맞은 것 (pilot 20)**: arm별 pilot 이후 비용비 corr(예측, 실측) = 0.957 (ε=0.02) / 0.971 (ε=0.01), 전 arm 대상.
-D3(λ-CV vs coef-1) 2/2 — COVID에서는 coef-1이 낫다고 예측했고 실제로 그랬음(비용비 0.47 vs 0.75). 분해 예측 uniform→nz 0.50/0.28 vs 실측 0.46/0.28.
-**(2) 틀린 것**: v1 공식의 pilot 이후 라벨 수 592 vs 실측 203 (COVID), 246 vs 58 (Touché) — 3–4배 과대. 원인 두 가지를 확인:
-  (a) 모집단 estimand에서 pilot 부분(N=50 중 20)이 정확히 알려져 나머지에 요구되는 정밀도가 N/N_R(=1.67)배 느슨함 → 라벨 (N_R/N)²=0.36배;
-  (b) v1은 f=1을 가정(작은 예산에서 query 간 분산이 남는 효과 무시).
-**(3) 예측기 개선 (held-out을 본 뒤 만든 것이므로 사전 등록 예측이 아님을 명시)** — `lib/costpredict.py`
-| 예측기 | 내용 | dev 18셀 결정 정확도 ε=.02/.01 | dev L_post (CAsT, DBpedia) | held-out pilot20 결정 | held-out pilot10 결정 | held-out L_post (COVID, Touché) |
+**(1) Pre-fixed predictions that were correct (pilot 20)**: per-arm post-pilot cost ratio corr(predicted, observed) = 0.957 (ε=0.02) / 0.971 (ε=0.01), over all arms.
+D3 (λ-CV vs coef-1) 2/2 — on COVID, coef-1 was predicted to be better and it was (cost ratio 0.47 vs 0.75). Decomposition prediction uniform→nz 0.50/0.28 vs observed 0.46/0.28.
+**(2) What was wrong**: v1 formula's post-pilot label count 592 vs observed 203 (COVID), 246 vs 58 (Touché) — 3–4× overestimated. Two causes confirmed:
+  (a) under the population estimand the pilot portion (20 of N=50) is known exactly, so the precision required on the rest is N/N_R (=1.67)× looser → labels (N_R/N)²=0.36×;
+  (b) v1 assumes f=1 (ignores the effect of remaining between-query variance at small budgets).
+**(3) Improved predictors (built after seeing the held-out, so explicitly not pre-registered predictions)** — `lib/costpredict.py`
+| Predictor | Content | dev 18-cell decision accuracy ε=.02/.01 | dev L_post (CAsT, DBpedia) | held-out pilot20 decision | held-out pilot10 decision | held-out L_post (COVID, Touché) |
 |---|---|---|---|---|---|---|
-| v1 | z²·b·v/s² | 14/18, 14/18 | 828, 793 (실측 1152, 1514) | 3/4, 1/4 | 2/4, 2/4 | 592, 246 (실측 203, 58) |
-| v2 | 2단계 분산 + 알려진 pilot 부분 | 14/18, 14/18 | 633, 751 | 4/4, 4/4 | 2/4, 2/4 | 213, 88 |
-| v3 | v2를 비교별로 계산해 max (구속 비교 = max v/s²) | 15/18, 14/18 | 636, 642 | 4/4, 4/4 | 4/4, 3/4 | 215, 46 |
-| v4 | v2 + 교차적합 slack(후보 선택 반쪽/slack 측정 반쪽) | 16/18 (오권고 0), 14/18 (오권고 0) | 1541, 1684 (과대); ε=.01 CAsT 발산 | 4/4, 4/4 | 3/4, 3/4 | 215, 89 |
-판독: **비용비(어느 arm, 상대적으로 얼마)는 pilot만으로 안정적으로 예측된다(상관 0.95–0.97, dev·held-out 모두).** 절대 라벨 수는 v2/v3로 held-out에서 맞고
-dev의 CAsT·DBpedia에서는 여전히 ~2배 과소 — 그 두 collection은 정책이 가깝고(true slack≈ε) pilot 20 query의 slack 추정이 winner's curse로 낙관적임
-(plain 0.037/0.039 → 교차적합 0.023/0.025). 교차적합(v4)은 낙관을 없애 오권고 0이 되지만 slack이 작을 때 불안정. 논문에는 v3를 "개선안", v4를 "보수적 변형"으로.
-결정 규칙의 요약: 오권고를 피하려면 v4, 누락을 피하려면 v3. dev에서 두 규칙이 일치하는 셀은 ε=.02에서 17/18(그중 15 정답), ε=.01에서 12/18(그중 11 정답); 불일치 셀은 모두 실측 절감이 문턱 5% 근처(0.03–0.06)이거나 CAsT ε=.01처럼 v4의 slack이 발산한 경우.
+| v1 | z²·b·v/s² | 14/18, 14/18 | 828, 793 (observed 1152, 1514) | 3/4, 1/4 | 2/4, 2/4 | 592, 246 (observed 203, 58) |
+| v2 | two-stage variance + known pilot portion | 14/18, 14/18 | 633, 751 | 4/4, 4/4 | 2/4, 2/4 | 213, 88 |
+| v3 | v2 computed per comparison, take max (binding comparison = max v/s²) | 15/18, 14/18 | 636, 642 | 4/4, 4/4 | 4/4, 3/4 | 215, 46 |
+| v4 | v2 + cross-fitted slack (candidate-selection half / slack-measurement half) | 16/18 (0 wrong recommendations), 14/18 (0 wrong recommendations) | 1541, 1684 (overestimated); ε=.01 CAsT diverges | 4/4, 4/4 | 3/4, 3/4 | 215, 89 |
+Reading: **the cost ratio (which arm, and how much relatively) is predicted stably from the pilot alone (correlation 0.95–0.97, on both dev and held-out).** The absolute label count is correct on held-out with v2/v3 but
+still ~2× underestimated on dev CAsT and DBpedia — in those two collections the policies are close (true slack≈ε) and the slack estimate from the 20 pilot queries is optimistic due to the winner's curse
+(plain 0.037/0.039 → cross-fitted 0.023/0.025). Cross-fitting (v4) removes the optimism and gives 0 wrong recommendations, but is unstable when the slack is small. In the paper, v3 as the "improved version" and v4 as the "conservative variant".
+Summary of the decision rule: to avoid wrong recommendations use v4, to avoid misses use v3. On dev the two rules agree in 17/18 cells at ε=.02 (15 of them correct) and 12/18 at ε=.01 (11 of them correct); the disagreeing cells all have observed savings near the 5% threshold (0.03–0.06) or, as with CAsT ε=.01, v4's slack diverges.
 
-### 16.9 Held-out 검증 2차 — Qwen3-8B 판정자, **v1–v4 모두 감사 전에 고정**(694e00b) (2026-09-17)
-판정 생성: `66_llm_judge.py`(이 머신, RTX 3090, COVID 4,165쌍 13분·Touché 1,858쌍 6분), 정확도 0.764/0.804(원고 0.76/0.79와 일치).
+### 16.9 Held-out validation round 2 — Qwen3-8B judge, **v1–v4 all fixed before the audit** (694e00b) (2026-09-17)
+Judgment generation: `66_llm_judge.py` (this machine, RTX 3090, COVID 4,165 pairs in 13 minutes·Touché 1,858 pairs in 6 minutes), accuracy 0.764/0.804 (consistent with the manuscript's 0.76/0.79).
 | | pilot 20, ε=.02 | pilot 20, ε=.01 | pilot 10, ε=.02 | pilot 10, ε=.01 |
 |---|---|---|---|---|
-| corr(pilot 비용비 예측, 실측) 전 arm | 0.918 | 0.939 | 0.932 | 0.939 |
-| 판정자 CV 실측 총 절감 (COVID cv/cvl; Touché cv/cvl) | .058/.058; .007/.007 | .070/.067; .024/.024 | .172/.148; .089/.074 | .207/.157; .112/.088 |
-| 결정 정확도 v1 / v2 / v3 / v4 (4셀) | 2/4, 2/4, **4/4**, 2/4 | 2/4, 2/4, **4/4**, 2/4 | 4/4 모두 | 4/4 모두 |
-| 총 절감 MAE v2 / v3 / v4 | .074/.053/.075 | .098/.067/.097 | .162/.113/.166 | .238/.183/.221 |
-| L_post 실측 vs v3 (COVID; Touché) | 203 vs 215; 58 vs 46 | 229 vs 264; 72 vs 62 | 304 vs 369; 97 vs 96 | 376 vs 491; 122 vs 143 |
-판독: (1) 비용비는 사전 예측대로(0.92–0.94). (2) 사전 고정된 결정 중 v3가 16/16 정답; v1·v2·v4의 오답 4개는 모두 Touché pilot 20에서 예측 절감
-0.044–0.055로 문턱 5% 바로 위였던 셀(실측 0.007–0.024). (3) 절대 크기는 pilot 10에서 과대(v3 MAE 0.11–0.18) — 예측이 방향은 맞고 크기는 상한 쪽.
-(4) COVID pilot 20의 실측 비용비 0.47은 예산 격자의 최소 예산(B=2)에서 이미 ACT ≥ 0.5라 검열된 상한이므로 진짜 비율은 그 이하(예측 0.25–0.38과 모순 아님).
-(5) D3(coef-1 vs λ-CV): COVID "coef-1 우세" 예측 → 실측 pilot 20에서 동률(1760.8 vs 1760.2, 검열), pilot 10에서 coef-1 우세(940 vs 968) ✓; Touché "λ-CV 우세" 예측 → 실측 동률/coef-1 근소 우세(434 vs 441) ✗(차이 1–2%, MC 오차 이내).
-결론: **"어느 설계가 얼마나 상대적으로 싼가"와 "판정자가 5% 이상 절감하는가"는 20-query pilot으로 사전에 맞힐 수 있다(v3 16/16 + reranker 8/8 pilot 20).
-"몇 라벨이 드는가"는 1.5배 이내(pilot 20), 2배 이내(pilot 10).** 한계: held-out 두 collection은 49–50 query라 pilot 비중이 커서 총 절감이 작다(≤ 21%);
-큰 N에서의 사전 등록 검증은 새 collection이 필요.
+| corr(pilot cost-ratio prediction, observed), all arms | 0.918 | 0.939 | 0.932 | 0.939 |
+| Judge CV observed total saving (COVID cv/cvl; Touché cv/cvl) | .058/.058; .007/.007 | .070/.067; .024/.024 | .172/.148; .089/.074 | .207/.157; .112/.088 |
+| Decision accuracy v1 / v2 / v3 / v4 (4 cells) | 2/4, 2/4, **4/4**, 2/4 | 2/4, 2/4, **4/4**, 2/4 | all 4/4 | all 4/4 |
+| Total saving MAE v2 / v3 / v4 | .074/.053/.075 | .098/.067/.097 | .162/.113/.166 | .238/.183/.221 |
+| L_post observed vs v3 (COVID; Touché) | 203 vs 215; 58 vs 46 | 229 vs 264; 72 vs 62 | 304 vs 369; 97 vs 96 | 376 vs 491; 122 vs 143 |
+Reading: (1) The cost ratio is as predicted in advance (0.92–0.94). (2) Among the pre-fixed decisions, v3 is 16/16 correct; the 4 errors of v1, v2 and v4 are all cells in Touché pilot 20 whose predicted saving
+of 0.044–0.055 was just above the 5% threshold (observed 0.007–0.024). (3) The absolute size is overestimated at pilot 10 (v3 MAE 0.11–0.18) — the prediction is right in direction and on the upper side in magnitude.
+(4) The observed cost ratio 0.47 for COVID pilot 20 is a censored upper bound, because ACT ≥ 0.5 already at the smallest budget of the grid (B=2), so the true ratio is at or below it (not inconsistent with the predicted 0.25–0.38).
+(5) D3 (coef-1 vs λ-CV): COVID predicted "coef-1 wins" → observed tie at pilot 20 (1760.8 vs 1760.2, censored), coef-1 wins at pilot 10 (940 vs 968) ✓; Touché predicted "λ-CV wins" → observed tie / coef-1 marginally ahead (434 vs 441) ✗ (difference 1–2%, within MC error).
+Conclusion: **"which design is relatively cheaper and by how much" and "does the judge save 5% or more" can be predicted in advance from a 20-query pilot (v3 16/16 + reranker 8/8 at pilot 20).
+"How many labels it takes" is within 1.5× (pilot 20) and within 2× (pilot 10).** Limitation: the two held-out collections have 49–50 queries, so the pilot share is large and the total saving is small (≤ 21%);
+pre-registered validation at large N requires a new collection.
 
-### 16.10 정정: pilot-20 held-out 셀의 검열 해제 (예산 B=1 추가, 2026-09-17)
-§16.8–16.9의 pilot-20 표는 최소 예산 B=2에서 판정자 arm의 ACT가 이미 ≥0.5인 셀(COVID cv, Touché cv/cvl; llm은 네 셀 모두)이 검열돼 J50이 상한이었다.
-B=1(4개 프로세스)을 추가해 검열을 없앤 최종 수치 (`PILOT_RULE_{rr,llm}_ho_eps*.csv`, B=1 ACT는 모든 arm < 0.5):
+### 16.10 Correction: un-censoring the pilot-20 held-out cells (budget B=1 added, 2026-09-17)
+In the pilot-20 tables of §16.8–16.9, cells where the judge arm's ACT was already ≥0.5 at the smallest budget B=2 (COVID cv, Touché cv/cvl; llm all four cells) were censored and their J50 was an upper bound.
+Final numbers with B=1 added (4 processes) to remove the censoring (`PILOT_RULE_{rr,llm}_ho_eps*.csv`, ACT at B=1 is < 0.5 for all arms):
 | pilot 20 | reranker ε=.02 / .01 | Qwen3-8B ε=.02 / .01 |
 |---|---|---|
-| corr(pilot 비용비 예측, 실측), 전 arm | 0.958 / 0.969 | 0.944 / 0.946 |
-| 판정자 CV 실측 총 절감 COVID cv, cvl; Touché cv, cvl | .062,.028; .008,.010 / .065,.026; .009,.011 | .072,.064; .028,.027 / .081,.067; .040,.035 |
-| 결정 정확도 v1 / v2 / v3 / v4 | 3/4, 4/4, 4/4, 4/4 / 1/4, 4/4, 4/4, 4/4 | 2/4, 2/4, **4/4**, 2/4 / 2/4, 2/4, **4/4**, 2/4 |
-| 총 절감 MAE v2 / v3 / v4 | .050/.035/.051 / .057/.039/.057 | .075/.052/.075 / .095/.066/.095 |
-| L_post 실측 vs v2 / v3 (COVID; Touché) | 203 vs 203/203; 58 vs 88/47 / 228 vs 248/248; 72 vs 125/63 | (판정자 무관, 동일) |
-사전 등록(llm, v1–v4 모두 감사 전 고정)의 최종 판정: **v3 8/8 정답, v2·v4 4/8(Touché에서 예측 절감 0.044–0.055 vs 실측 0.027–0.040: 문턱 5% 바로 양쪽), v1 4/8.**
-Touché는 판정자가 강해도(비용비 0.38) pilot이 총비용의 93%라 총 절감이 3–4%에 그친다 — "판정자가 얼마나 좋은가"와 "얼마나 절감되는가"가 다른 이유의 held-out 사례.
-reranker(v1만 사전 고정; v2–v4는 사후): v2–v4 8/8, v1 4/8.
+| corr(pilot cost-ratio prediction, observed), all arms | 0.958 / 0.969 | 0.944 / 0.946 |
+| Judge CV observed total saving COVID cv, cvl; Touché cv, cvl | .062,.028; .008,.010 / .065,.026; .009,.011 | .072,.064; .028,.027 / .081,.067; .040,.035 |
+| Decision accuracy v1 / v2 / v3 / v4 | 3/4, 4/4, 4/4, 4/4 / 1/4, 4/4, 4/4, 4/4 | 2/4, 2/4, **4/4**, 2/4 / 2/4, 2/4, **4/4**, 2/4 |
+| Total saving MAE v2 / v3 / v4 | .050/.035/.051 / .057/.039/.057 | .075/.052/.075 / .095/.066/.095 |
+| L_post observed vs v2 / v3 (COVID; Touché) | 203 vs 203/203; 58 vs 88/47 / 228 vs 248/248; 72 vs 125/63 | (judge-independent, identical) |
+Final verdict of the pre-registration (llm, v1–v4 all fixed before the audit): **v3 8/8 correct, v2·v4 4/8 (on Touché predicted saving 0.044–0.055 vs observed 0.027–0.040: just on either side of the 5% threshold), v1 4/8.**
+On Touché, even with a strong judge (cost ratio 0.38), the pilot is 93% of the total cost so the total saving stays at 3–4% — a held-out example of why "how good the judge is" and "how much is saved" differ.
+reranker (only v1 fixed in advance; v2–v4 post hoc): v2–v4 8/8, v1 4/8.
 
-### 16.11 원고 압축 (2026-09-17)
-25쪽 → 20쪽(본문 11쪽 + 참고문헌 + 부록 8쪽). 초록 450 → 370단어. 기여 4항목을 2–4문장으로, §3 MSE 재측정 세부·§4 exactness·§5.3 estimand 귀속 수치·§7 CAsT/ANTIQUE 서술·§8 (2) 메뉴 배분을 절반 이하로 줄이고 세부는 부록(F에 estimand 귀속, D·E 압축)으로. 비용 모델·pilot 규칙·held-out을 §5.3의 두 문단으로 통합. 수치는 모두 이전 본문 값을 그대로 옮김(신규 수치 없음). 남은 편집: 부록 F/H의 문장 다듬기, 표 캡션 통일.
+### 16.11 Manuscript compression (2026-09-17)
+25 pages → 20 pages (11 pages of main text + references + 8 pages of appendix). Abstract 450 → 370 words. The 4 contribution items reduced to 2–4 sentences each; §3 MSE re-measurement details, §4 exactness, §5.3 estimand-attribution numbers, §7 CAsT/ANTIQUE narrative, and §8 (2) menu allocation cut to less than half, with details moved to the appendix (estimand attribution to F; D and E compressed). Cost model, pilot rule and held-out merged into two paragraphs of §5.3. All numbers carried over unchanged from the previous text (no new numbers). Remaining edits: polishing sentences in Appendices F/H, unifying table captions.
 
-### 16.12 제목·그림·문체 (2026-09-17)
-- 제목: "Certifying Retrieval Policies with Non-Neutral AI Judges: What a Judge Saves, and How a Pilot Predicts It".
-- 그림: `99_figures.py` + `lib/figstyle.py`로 F4–F9를 저장된 CSV/parquet에서 한 스타일(STIX 서체, 그림 내 제목 없음, Okabe–Ito 팔레트, 읽을 수 있는 collection·판정자 이름, 범례 바깥)로 재생성. F5는 `planner_v2/judged_*_ext/planner_v2.parquet`에서 누적 ACT를 다시 계산.
-- 문체: "Three things follow", "It is tempting to read", 자화자찬성 표현, 문장 중간의 em-dash 삽입구를 제거·분리. 수치 불변.
-- 커밋 메시지의 co-author trailer는 저장소 규약(§12.9)에 따라 제거, 로컬 commit-msg hook 설치.
+### 16.12 Title, figures, style (2026-09-17)
+- Title: "Certifying Retrieval Policies with Non-Neutral AI Judges: What a Judge Saves, and How a Pilot Predicts It".
+- Figures: F4–F9 regenerated from the stored CSV/parquet with `99_figures.py` + `lib/figstyle.py` in one style (STIX typeface, no in-figure titles, Okabe–Ito palette, readable collection and judge names, legend outside). F5 recomputes cumulative ACT from `planner_v2/judged_*_ext/planner_v2.parquet`.
+- Style: removed or split "Three things follow", "It is tempting to read", self-congratulatory phrasing, and mid-sentence em-dash parentheticals. Numbers unchanged.
+- The co-author trailer in commit messages removed per the repository convention (§12.9); local commit-msg hook installed.
 
-### 16.13 리뷰(5210aee) 대응 (2026-09-17)
-1. **재현 오류 복구**: `81 --predict_only`가 감사 요약 CSV를 빈 파일로 덮어쓰던 버그 수정(예측 분기를 요약 저장 앞으로). dev 84개 요약은 Track C 커밋(3b4ebd5)에서 복원, reranker held-out은 재감사(draw 기록 값 동일, 열 11개 추가). `86 v3`가 TABLE2_v3를 그대로 재생성함을 확인. 이름 충돌 잔해(`_heldout_b*`) 삭제.
-2. **단일 pilot 실행 규칙** (`97`, `PILOT_RULE_single_eps*.csv`): draw마다 그 pilot의 v3 예측 절감 > 5%면 λ-CV, 아니면 weighted. ε=0.02 절감(항상 λ-CV / 규칙): ANTIQUE 7.8/6.0, CAsT Qwen 19.1/19.1, CAsT rr 13.6/10.7, DBpedia 19.5/18.5·19.4/19.2, DL 3.4/2.9, 반전 판정자 1.6·4.8(잡음)/0(채택 안 함); held-out Qwen pilot 20: COVID 6.4/5.7, Touché 2.7/0.8 (draw별 pilot 비용 사용, 리뷰 반영); pilot 10: 14.8/14.8, 7.4/7.5. 규칙의 wrong-cert 0. pilot별 일치율 dev 45–98%(DL 21–23은 문턱 근처라 45%), held-out Qwen 52–99%.
-3. **held-out 서술 정정**: "개발에 안 쓴 collection"이 아니라 "reranker 결과를 본 뒤 v2–v4를 만들고, 같은 collection에서 새 판정자(Qwen3-8B)로 v1–v4를 사전 고정"; v3를 주 예측기로 지정한 시점(결과 이후)을 명시. 다수결 8/8과 단일 pilot 성능을 분리해 서술.
-4. 원고: Prop. A 증명을 유한 N으로, F8 캡션 175→193, F8을 본문 §5.3으로, F5를 부록 E로 이동.
-5. 남은 것: 개발에 전혀 쓰지 않은 큰 collection에서 규칙 하나를 고정한 독립 검증(§16.7의 최종 실험).
+### 16.13 Response to review (5210aee) (2026-09-17)
+1. **Reproduction error recovery**: fixed the bug where `81 --predict_only` overwrote the audit summary CSV with an empty file (moved the prediction branch before the summary save). The 84 dev summaries restored from the Track C commit (3b4ebd5); the reranker held-out re-audited (per-draw recorded values identical, 11 columns added). Confirmed that `86 v3` regenerates TABLE2_v3 exactly. Name-collision remnants (`_heldout_b*`) deleted.
+2. **Single-pilot execution rule** (`97`, `PILOT_RULE_single_eps*.csv`): per draw, if that pilot's v3 predicted saving > 5% then λ-CV, otherwise weighted. ε=0.02 savings (always λ-CV / rule): ANTIQUE 7.8/6.0, CAsT Qwen 19.1/19.1, CAsT rr 13.6/10.7, DBpedia 19.5/18.5·19.4/19.2, DL 3.4/2.9, inverted judge 1.6·4.8 (noise)/0 (not adopted); held-out Qwen pilot 20: COVID 6.4/5.7, Touché 2.7/0.8 (per-draw pilot cost used, per the review); pilot 10: 14.8/14.8, 7.4/7.5. Wrong-cert of the rule: 0. Per-pilot agreement rate dev 45–98% (DL 21–23 is near the threshold, hence 45%), held-out Qwen 52–99%.
+3. **Correction of the held-out description**: not "a collection unused in development" but "v2–v4 were built after seeing the reranker results, and v1–v4 were pre-fixed on the same collections with a new judge (Qwen3-8B)"; the time at which v3 was designated the main predictor (after the results) is stated. The 8/8 majority-vote result and the single-pilot performance are described separately.
+4. Manuscript: Prop. A proof in finite-N form, F8 caption 175→193, F8 moved to main text §5.3, F5 moved to Appendix E.
+5. Remaining: independent validation with a single fixed rule on a large collection never used in development (the final experiment of §16.7).
 
-### 16.14 LOCK v0.7 결과 — NeuCLIRBench 영어 mono, 개발에 전혀 쓰지 않은 collection (2026-09-17, 규칙 무변경)
-데이터: 105 topic, pool 70.7 문서/query, 관련(gain≥1) 비율 0.27, nG 평균 18.9. 판정 정확도: Qwen3-8B **0.437**(관련성 정의 불일치, ANTIQUE와 같은 상황), reranker 0.586. wrong-cert 최대 0.013(전 셀).
-| Qwen3-8B | 예측 λ-CV 비용비 | 실측 | 예측 총 절감(v3) | 실측 | v3 판단(pilot 과반) | 정답? | 단일 pilot 규칙 절감 / 항상-CV / 채택률 |
+### 16.14 LOCK v0.7 results — NeuCLIRBench English mono, a collection never used in development (2026-09-17, rule unchanged)
+Data: 105 topics, pool 70.7 documents/query, relevant (gain≥1) fraction 0.27, mean nG 18.9. Judge accuracy: Qwen3-8B **0.437** (relevance-definition mismatch, same situation as ANTIQUE), reranker 0.586. Wrong-cert at most 0.013 (all cells).
+| Qwen3-8B | Predicted λ-CV cost ratio | Observed | Predicted total saving (v3) | Observed | v3 decision (pilot majority) | Correct? | Single-pilot rule saving / always-CV / adoption rate |
 |---|---|---|---|---|---|---|---|
-| pilot 20, ε=.02 | 0.71 | 0.90 | 4.5% | 2.1% | 비권고(0.47) | ✓ | 1.6 / 2.1 / 47% |
-| pilot 20, ε=.01 | 0.72 | 0.82 | 5.7% | 5.3% | 권고(0.52) | ✓ | 2.3 / 5.3 / 55% |
-| pilot 10, ε=.02 | 0.76 | 0.87 | 7.0% | 6.0% | 권고(0.60) | ✓ | 4.6 / 6.0 / 57% |
-| pilot 10, ε=.01 | 0.76 | 0.93 | 8.2% | 3.8% | 권고(0.61) | ✗ | 5.0 / 3.8 / 60% |
-reranker·반전: 예측 "비권고" 8/8 정답(실측 절감 −0.8~+2.8%, 잡음); coef-1 CV 손해 예측(1.21/1.34) → 실측 손해(1.03–1.13 / 1.14–1.29) 방향 일치.
-전 arm 비용비 예측 상관: Qwen 0.86–0.92, rr 0.89–0.97, inv 0.89–0.96. 분해 예측 0.66/0.47/0.82 vs 실측 0.62/0.52/0.82.
-L_post(pilot 20): 실측 401/592 vs v3 324/440(과소 20–25%), v2 351/484, v1 536/738(과대). pilot 10: 실측 578/798 vs v3 349/484(과소 40%).
-**사전 기준(문면 그대로 재집계, 외부 재검토 반영)**: (a) 규칙이 두 고정 정책 중 나은 쪽 대비 2%p 이내 — 12셀 중 **9** 충족(미충족: Qwen p20 ε=.01 2.35 vs 5.26; 반전 p20 ε=.01 0.09 vs 2.73; reranker p10 ε=.01 0.56 vs 2.79 — 뒤 둘은 규칙이 무시하도록 설계된 5% 미만 이득이지만 lock에 제외 조항이 없으므로 미충족으로 셈); (b) 반전 판정자 채택 ≤10% — 4셀 중 1 충족(6.9/11.6/11.9/14.7%). 두 기준을 전 설정에서 충족: **미충족**. Qwen 상관 범위는 0.825–0.923(원고 0.86–0.92는 오기 → 0.83–0.92로 정정). pilot 20에서 개별 pilot의 권고는 47%/52%로 거의 반반.
-판독: 상대 비용·분해·"약한 판정자는 쓰지 말 것"은 새 collection에서도 맞았다. Qwen λ-CV의 비용비는 낙관적(0.71 예측 vs 0.82–0.93 실측): 정확도 0.44인 판정자에서 pilot 20 query로 적합한 λ와 잔차 분산이 pilot 안에서 과적합된 것으로 보인다(같은 pilot으로 λ를 적합하고 그 pilot에서 분산을 평가). 개선 후보(v5): pilot 내 교차적합 λ로 v_pilot 계산 — 이 collection에서는 사후이므로 별도 검증 필요. 판단은 4/4 중 3/4이며 네 셀 모두 문턱 5% 근처(실측 2.1–6.0%). 총 절감이 작은 이유는 pilot이 총비용의 70–78%(p20)이기 때문.
+| pilot 20, ε=.02 | 0.71 | 0.90 | 4.5% | 2.1% | not recommended (0.47) | ✓ | 1.6 / 2.1 / 47% |
+| pilot 20, ε=.01 | 0.72 | 0.82 | 5.7% | 5.3% | recommended (0.52) | ✓ | 2.3 / 5.3 / 55% |
+| pilot 10, ε=.02 | 0.76 | 0.87 | 7.0% | 6.0% | recommended (0.60) | ✓ | 4.6 / 6.0 / 57% |
+| pilot 10, ε=.01 | 0.76 | 0.93 | 8.2% | 3.8% | recommended (0.61) | ✗ | 5.0 / 3.8 / 60% |
+reranker and inverted: predicted "not recommended" 8/8 correct (observed savings −0.8~+2.8%, noise); coef-1 CV predicted as a loss (1.21/1.34) → observed loss (1.03–1.13 / 1.14–1.29), direction agrees.
+All-arm cost-ratio prediction correlation: Qwen 0.86–0.92, rr 0.89–0.97, inv 0.89–0.96. Decomposition prediction 0.66/0.47/0.82 vs observed 0.62/0.52/0.82.
+L_post (pilot 20): observed 401/592 vs v3 324/440 (underestimated 20–25%), v2 351/484, v1 536/738 (overestimated). pilot 10: observed 578/798 vs v3 349/484 (underestimated 40%).
+**Pre-specified criteria (re-tallied literally as written, incorporating external re-review)**: (a) the rule is within 2 percentage points of the better of the two fixed policies — **9** of 12 cells satisfied (not satisfied: Qwen p20 ε=.01 2.35 vs 5.26; inverted p20 ε=.01 0.09 vs 2.73; reranker p10 ε=.01 0.56 vs 2.79 — the latter two are sub-5% gains the rule is designed to ignore, but since the lock has no exclusion clause they are counted as not satisfied); (b) inverted-judge adoption ≤10% — 1 of 4 cells satisfied (6.9/11.6/11.9/14.7%). Both criteria satisfied in all settings: **not satisfied**. The Qwen correlation range is 0.825–0.923 (the manuscript's 0.86–0.92 is a typo → corrected to 0.83–0.92). At pilot 20, individual pilots' recommendations are 47%/52%, nearly half and half.
+Reading: relative cost, decomposition and "do not use a weak judge" held on the new collection too. The Qwen λ-CV cost ratio is optimistic (0.71 predicted vs 0.82–0.93 observed): with a judge of accuracy 0.44, the λ fitted on 20 pilot queries and the residual variance appear to be overfitted within the pilot (λ is fitted on the same pilot and the variance is evaluated on that pilot). Improvement candidate (v5): compute v_pilot with a cross-fitted λ within the pilot — post hoc on this collection, so separate validation is needed. The decision is 3/4 of 4/4 and all four cells are near the 5% threshold (observed 2.1–6.0%). The total saving is small because the pilot is 70–78% of the total cost (p20).
 
-### 16.15 문체 최종 손질 (2026-09-17, 외부 리뷰 "AI가 요약을 반복하는 인상" 대응)
-- 초록 마지막 문장: "We propose no new estimator" 제거, 결과로 끝맺음 (서론의 같은 문장은 유지).
-- Table 2 해설: "neither part is dispensable" 같은 결과 재진술 문장 삭제.
-- COVID/Touché 검증 문단(~550단어)을 설계 / 결과 / 한계 세 문단으로 분리. Table 3에 있는 rule 절감률 숫자는 본문에서 제거하고 표 참조로 대체. pilot 10의 "0.11–0.18" 수치는 출처 불명확하여 표 참조로 대체.
-- NeuCLIR 결과 문단(~400단어): Qwen 예측 vs 실현 / 규칙과 기준 두 문단으로 분리, 네 셀 절감률 숫자는 표 참조, 마지막 "The independent test thus supports…" 요약 문장 삭제(near-threshold 한 문장만 유지).
-- Negative results: "Four things did not work as hoped" → "Four results bound the contribution"; (4)의 철회 경위는 Appendix I(재현성 노트)로 이동, 본문은 현재 결과만.
-- 사전 고정 시점, 실패한 기준(9/12, 1/4), 예측기 수정 순서는 모두 그대로. 컴파일 22쪽, 경고 없음. 초록 303단어.
-- (추가, 같은 날) 리뷰 후속: 초록 마지막 문장 삭제(273단어), Negative results 도입문 "Four results bound the contribution." 삭제. 전 레포의 `TMLR_submission_anonymous.zip`이 문체 수정 전 원고를 담고 있던 것을 최신 tex/pdf/figures로 다시 묶음(식별 문자열 검사 통과). 22쪽, 경고 없음.
+### 16.15 Final style pass (2026-09-17, in response to the external review's "impression that an AI keeps repeating summaries")
+- Last sentence of the abstract: "We propose no new estimator" removed, ending with the result (the same sentence in the introduction is kept).
+- Table 2 commentary: result-restating sentences such as "neither part is dispensable" deleted.
+- The COVID/Touché validation paragraph (~550 words) split into three paragraphs: design / results / limitations. The rule saving-rate numbers present in Table 3 removed from the text and replaced with a table reference. The pilot-10 "0.11–0.18" figure had an unclear source and was replaced with a table reference.
+- NeuCLIR results paragraph (~400 words): split into two paragraphs, Qwen predicted vs realized / rule and criteria; the four cells' saving-rate numbers refer to the table; the final "The independent test thus supports…" summary sentence deleted (only the one near-threshold sentence kept).
+- Negative results: "Four things did not work as hoped" → "Four results bound the contribution"; the retraction history in (4) moved to Appendix I (reproducibility note), the main text keeps only the current results.
+- Pre-fixing times, the failed criteria (9/12, 1/4), and the order of predictor revisions all unchanged. Compiles to 22 pages, no warnings. Abstract 303 words.
+- (Addendum, same day) Review follow-up: last sentence of the abstract deleted (273 words), the Negative results lead-in "Four results bound the contribution." deleted. The `TMLR_submission_anonymous.zip` in the whole repository contained the pre-style-fix manuscript, so it was re-bundled with the latest tex/pdf/figures (identifying-string check passed). 22 pages, no warnings.

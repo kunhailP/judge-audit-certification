@@ -1,96 +1,96 @@
-# 외부 리뷰(e0609ea 기준)에 대한 판단, 확인 결과, 오늘 구현, 결정 요청 — 2026-09-14
+# Assessment of the external review (against e0609ea), verified findings, today's implementation, and decisions requested — 2026-09-14
 
-## 0. 한 줄 판단
+## 0. One-line assessment
 
-리뷰의 사실 지적은 **전부 코드에서 재현·확인됐다** (§2). 방향 제안(§6 메뉴 동시 인증의 최소 감사 비용)은 타당하지만
-독창성은 아직 열려 있고, transductive linear bandit의 최적 실험설계로 얼마나 환원되는지가 먼저 판가름 나야 한다.
-현재 원고는 "정직한 TMLR 게재 논문"의 재료이며, Featured로 가려면 리뷰가 말한 대로 **비용·인증 정합성 → 정확한 oracle
-격차 측정 → 그 격차를 실제 절차로 달성하는 이론·알고리즘** 순서가 맞다. 나는 그 순서에 동의하되, 두 군데에서 판단을
-달리한다(§1.4, §1.6).
+The review's factual points were **all reproduced and confirmed in the code** (§2). The directional proposal (§6, the minimum audit cost of simultaneous menu certification) is sound, but
+its originality is still open, and the first thing to settle is how far it reduces to optimal experimental design for transductive linear bandits.
+The current manuscript is the material for an "honest TMLR paper"; to go for Featured, the order the review gives is right: **cost/certificate consistency → exact measurement of the oracle
+gap → theory and an algorithm that attain that gap with a real procedure**. I agree with that order, but differ in judgment at two
+points (§1.4, §1.6).
 
-## 1. 리뷰 항목별 판단
+## 1. Assessment per review item
 
-### 1.1 §2 인증 유효성 — 동의 (가장 중요)
-- `ucb_t`(certificates.py) 반례를 실행했다: D=1 w.p. 0.02, n=30, ε=0.01 → 잘못된 인증률 **0.549** (이론 0.98³⁰=0.545).
-  t 경계는 점근적이며, 원고의 Prop. B가 적는 `Pr(∃t: wrong ACT) ≤ α`는 유한표본 진술로는 성립하지 않는다.
-- 추가로 발견: 문서 단위 HT/CV 추정치의 범위는 Σ|w|/π 규모(π ∝ |w|이면 n·Σ|w|/b)라서 bounded-range 경계가 사실상
-  작동하지 않는다(§3.2 합성 검증에서 betting 경계 ACT = 0). **문서 단위 유한표본 인증은 미해결 문제**이며, 이것 자체가
-  기여 후보다(§5).
-- Kilian et al.의 anytime-valid PPI는 **점근 CS**라 정확 보장이 아니다. 정확 보장은 bounded 관측의 betting/EB 경계
-  (Waudby-Smith & Ramdas; Maurer & Pontil)로만 얻는다. **유한모집단 estimand**(§1.4)를 택하면 PPI의 unlabeled 평균
-  λ·mean_N(D̂)이 확정값이 되고, 나머지는 [−(1+λ), 1+λ]에 갇힌 rectifier의 평균이므로 betting 경계가 그대로 적용된다 —
-  PPI 인증서도 유한표본 정확으로 만들 수 있는 깔끔한 길이다.
+### 1.1 §2 Certificate validity — agree (most important)
+- Ran the `ucb_t` (certificates.py) counterexample: D=1 w.p. 0.02, n=30, ε=0.01 → wrong-certificate rate **0.549** (theory 0.98³⁰=0.545).
+  The t bound is asymptotic, and the manuscript's Prop. B statement `Pr(∃t: wrong ACT) ≤ α` does not hold as a finite-sample statement.
+- Additional finding: the range of document-level HT/CV estimates is of order Σ|w|/π (n·Σ|w|/b when π ∝ |w|), so bounded-range bounds effectively
+  do not work (betting-bound ACT = 0 in the §3.2 synthetic validation). **Document-level finite-sample certification is an open problem**, and that is itself
+  a candidate contribution (§5).
+- Kilian et al.'s anytime-valid PPI is an **asymptotic CS**, not an exact guarantee. Exact guarantees come only from betting/EB bounds on bounded observations
+  (Waudby-Smith & Ramdas; Maurer & Pontil). If we adopt the **finite-population estimand** (§1.4), the PPI unlabeled mean
+  λ·mean_N(D̂) becomes a fixed quantity, and the remainder is the mean of a rectifier confined to [−(1+λ), 1+λ], so the betting bound applies directly —
+  a clean route to making the PPI certificate finite-sample exact as well.
 
-### 1.2 §3 비용 집계 — 동의, 영향은 리뷰 추정보다 클 수 있음
-- `82`의 `nlab[m] += samp.sum()/len(others)`는 비교당 평균(확인). `81`은 비교마다 독립 표본이고 예산 B를 비교 수만큼
-  중복 지출한다(확인). `84`의 J50 환산은 `82`의 이 값으로 모든 문서 단위 블록을 환산하므로 **Table 2 전체가 과소 계상**이다.
-- pilot: `fit_params()`가 `nG`(pool 전체의 관련 문서 수)를 읽는데 비용은 최대 cutoff까지만 계상(확인). dbpedia는 pool
-  평균 51.6이고 최대 cutoff는 십수 개 수준이라 pilot 20 query의 실제 라벨은 약 1,030 ↔ 계상 약 260. 이 차이는 모든
-  문서 단위 arm에 공통 가산되므로 **절대 J50은 크게 오르고 상대 절감률은 압축**된다. 균등 vs 가중의 "절반" 주장은 재계산 전까지 보류.
+### 1.2 §3 Cost accounting — agree; the impact may be larger than the review estimates
+- `82`'s `nlab[m] += samp.sum()/len(others)` is a per-comparison average (confirmed). `81` draws an independent sample per comparison and spends budget B
+  once per comparison (confirmed). `84`'s J50 conversion uses this value from `82` to convert every document-level block, so **all of Table 2 is under-counted**.
+- pilot: `fit_params()` reads `nG` (the number of relevant documents in the whole pool), but cost is charged only up to the maximum cutoff (confirmed). dbpedia has a pool
+  mean of 51.6 and the maximum cutoff is in the low tens, so the actual labels for the 20 pilot queries are about 1,030 vs. about 260 charged. This difference is added uniformly to every
+  document-level arm, so **absolute J50 rises substantially and relative savings are compressed**. The "half" claim for uniform vs. weighted is on hold until recomputation.
 
-### 1.3 §4 불일치 — 동의
-- `63` 317–318행: 후보를 **검증 반쪽 U**에서 고른다(확인). 유효성은 M(M−1) 동시 보정이 지켜 주고 있었고(자체 테스트
-  0.014 ≤ 0.020), 원고 Prop. B의 "훈련 반쪽에서 선택" 서술이 구현과 다르다.
-- `63` 351행: wrong_cert를 `perm[T:]`(미감사 잔여)로 계산, `80–83`은 전체 N 평균(확인). 잔여 평균은 감사 평균과
-  결정적으로 연동돼 분산이 (N/(N−T))² 배 커지는 더 어려운 표적이다(T=90, N=211이면 3배).
-- `82`: 잔차 모델은 연속 p̂로, CV는 이진 rj로(확인).
-- `67`: 이득 = 추정 SE 평균의 비율(확인). 합성 실행에서 MC-MSE 비(6.4 / 16.1)와 SE 비(5.2 / 4.1)가 실제로 달랐다.
+### 1.3 §4 Inconsistencies — agree
+- `63` lines 317–318: candidates are chosen from the **validation half U** (confirmed). Validity was being preserved by the M(M−1) simultaneous correction (self-test
+  0.014 ≤ 0.020), and the manuscript's Prop. B statement "selected on the training half" differs from the implementation.
+- `63` line 351: wrong_cert is computed on `perm[T:]` (the unaudited remainder), whereas `80–83` use the full-N mean (confirmed). The remainder mean is deterministically coupled to the
+  audited mean, making it a harder target with variance inflated by (N/(N−T))² (3× for T=90, N=211).
+- `82`: the residual model uses continuous p̂, the CV uses binary rj (confirmed).
+- `67`: gain = ratio of mean estimated SEs (confirmed). In the synthetic run the MC-MSE ratios (6.4 / 16.1) and SE ratios (5.2 / 4.1) actually differed.
 
-### 1.4 후보 선택·estimand에 대한 내 판단 (리뷰와 다른 부분)
-- 후보를 검증 반쪽에서 고르는 것은 **오류가 아니라 더 효율적인 유효한 설계**다: 모든 순서쌍에 대한 union bound는
-  후보가 어느 데이터로 골라졌든 덮는다. 따라서 코드가 아니라 **Prop. B의 문장을 고치는 쪽**을 권한다(분할은 정책
-  파라미터 c, τ에만 필요). 대신 "훈련 반쪽 선택 + (M−1) 보정"이 더 효율적일 가능성은 실험으로 비교한다(`--cand_on train`).
-- estimand는 **유한모집단 평균(전체 N)** 으로 통일하는 것을 권한다. 배포 결정의 대상이 그 collection이고, PPI의
-  unlabeled 평균도 그 위에서 정의되며, §1.1의 유한표본 PPI 인증서가 여기서 성립한다. LOCK v0.4는 잔여 평균으로 정의됐으므로
-  v0.4 표는 그대로 두고 population 값을 병기한다.
+### 1.4 My judgment on candidate selection and the estimand (where I differ from the review)
+- Choosing candidates on the validation half is **not an error but a more efficient valid design**: the union bound over all ordered pairs
+  covers the candidate regardless of which data it was selected on. I therefore recommend **fixing the wording of Prop. B** rather than the code (the split is needed only for the policy
+  parameters c, τ). Whether "training-half selection + (M−1) correction" is more efficient is instead compared experimentally (`--cand_on train`).
+- I recommend unifying the estimand as the **finite-population mean (full N)**. The deployment decision concerns that collection, PPI's
+  unlabeled mean is defined on it, and the finite-sample PPI certificate of §1.1 holds there. LOCK v0.4 was defined with the remainder mean, so
+  the v0.4 tables stay as they are and the population values are reported alongside.
 
-### 1.5 §5 문헌 — 동의, 5편 모두 확인(02_literature Batch 4)
-"No Free Lunch"는 우리 F6 문턱·always-PPI 손실을 이론으로 선점했다. AM-PPI는 판정자 라우팅·표집·가중을 공동 최적화했다.
-Noisy-but-Valid는 불완전 판정자로 **유한표본** 인증을 한다. 남는 차별점은 (i) 추정 대상이 "정책 쌍의 결정 가중 선형
-범함수"라는 문제 사상, (ii) 여러 비교가 한 라벨을 공유하는 **메뉴 동시 인증**, (iii) 문서 단위 유한표본 인증의 비용. (i)만으로는 부족하다.
+### 1.5 §5 Literature — agree, all 5 papers verified (02_literature Batch 4)
+"No Free Lunch" theoretically pre-empts our F6 threshold and the always-PPI loss. AM-PPI jointly optimises judge routing, sampling and weighting.
+Noisy-but-Valid does **finite-sample** certification with imperfect judges. The remaining points of difference are (i) the problem mapping in which the estimation target is a "decision-weighted linear
+functional of a policy pair", (ii) **simultaneous menu certification** where multiple comparisons share one label, (iii) the cost of document-level finite-sample certification. (i) alone is not enough.
 
-### 1.6 §6 방향 — 동의하되 환원 검토를 먼저
-- `83`의 oracle은 λ_j = 1/max(ε−gap_j, 0.002) 휴리스틱(확인). 정확한 최적해가 아니므로 5–18%는 상한이 아니다.
-- 리뷰의 설계 문제 min_π max_j V_j(π)/s_j²는 **볼록**이고 라그랑주 쌍대로 정확히 풀린다(`lib/design.py`, §3.4).
-  합성 검증: 결정 문서가 비겹칠 때 정적 합산 대비 68배, 겹칠 때 1.00배 — 이득이 "비겹침"으로 설명된다는 설계 문서 §2 가설과 일치.
-- 그러나 이 문제는 문서 = arm, 비교 = 방향 w_j인 **transductive linear bandit의 XY-optimal design**과 형식이 같다
-  (Fiez et al. 2019; Soare et al. 2014). 우리 특수성은 (a) 응답이 Bernoulli이고 잔차 분산이 판정자에 의존, (b) 라벨 비용
-  이질성, (c) 정지 규칙이 ε-인증. 독창성은 "이 구조에서 실제 절차가 oracle 격차의 얼마를 회수하는가"에서 나와야 한다.
-- **판단을 가르는 실험**: 실데이터에서 정확 oracle vs 정적 합산(+CV)의 J50 비. 내 go/no-go 제안은 §6.
+### 1.6 §6 Direction — agree, but check the reduction first
+- `83`'s oracle is the heuristic λ_j = 1/max(ε−gap_j, 0.002) (confirmed). It is not the exact optimum, so 5–18% is not an upper bound.
+- The review's design problem min_π max_j V_j(π)/s_j² is **convex** and solved exactly via the Lagrange dual (`lib/design.py`, §3.4).
+  Synthetic validation: 68× over static summation when decision documents do not overlap, 1.00× when they overlap — consistent with the design-document §2 hypothesis that the gain is explained by "non-overlap".
+- However, this problem has the same form as the **XY-optimal design of a transductive linear bandit** with document = arm, comparison = direction w_j
+  (Fiez et al. 2019; Soare et al. 2014). Our specifics are (a) Bernoulli responses with residual variance depending on the judge, (b) heterogeneous label
+  costs, (c) an ε-certification stopping rule. Originality has to come from "how much of the oracle gap does a real procedure recover in this structure".
+- **The deciding experiment**: on real data, the J50 ratio of exact oracle vs. static summation (+CV). My go/no-go proposal is in §6.
 
-### 1.7 §7 실험 재구성 — 동의; 단 비용이 큼
-비중첩 정책(서로 다른 검색기·reranker), 새 collection, 대화 turn 의존성은 pool 재구축 + LLM 판정(GPU)이 필요하다.
-우선순위는 1) 기존 pool에서 비용·인증 재계산, 2) oracle 격차 측정, 3) 그 결과가 좋을 때만 새 pool.
+### 1.7 §7 Experiment redesign — agree; but the cost is high
+Non-nested policies (different retrievers/rerankers), new collections, and conversational-turn dependence require pool rebuilding + LLM judging (GPU).
+Priorities: 1) recompute cost and certification on the existing pools, 2) measure the oracle gap, 3) build new pools only if those results are good.
 
-## 2. 코드에서 확인한 사실 (파일:행, e0609ea)
+## 2. Facts confirmed in the code (file:line, e0609ea)
 
-| 지적 | 위치 | 확인 |
+| Point | Location | Confirmed |
 |---|---|---|
-| t 경계 sd=0 → UCB=평균 | `lib/certificates.py` `ucb_t` | 재현(0.549) |
-| 비교당 평균 비용 | `82_active_inference.py:92` `nlab[m] += samp.sum()/len(others)` | 확인 |
-| 비교마다 독립 표본, 예산 중복 지출 | `81_sampling_baselines.py:106–124` (`for j in others: … sample_pi(bases[key], b, n)`) | 확인 |
-| pilot 비용 = 최대 cutoff, 실제는 nG 사용 | `80/81/82` `cost_full[tr].sum()` vs `63:158–162 fit_params` | 확인 |
-| 후보를 검증 반쪽에서 선택 | `63_planner_v2.py:317–318` | 확인 |
-| 잔여 표본 estimand | `63_planner_v2.py:351` `ev = H[perm[T:]]` | 확인 |
-| 잔차 모델 p̂ vs CV rj | `82:66–74` vs `82:91` | 확인 |
-| oracle = 휴리스틱 λ | `83_menu_allocation.py:92` | 확인 |
-| 이득 = SE 비율 | `67_ppi_gain.py:66` | 확인 |
+| t bound sd=0 → UCB=mean | `lib/certificates.py` `ucb_t` | Reproduced (0.549) |
+| Per-comparison averaged cost | `82_active_inference.py:92` `nlab[m] += samp.sum()/len(others)` | Confirmed |
+| Independent sample per comparison, budget spent repeatedly | `81_sampling_baselines.py:106–124` (`for j in others: … sample_pi(bases[key], b, n)`) | Confirmed |
+| pilot cost = max cutoff, actual use is nG | `80/81/82` `cost_full[tr].sum()` vs `63:158–162 fit_params` | Confirmed |
+| Candidates selected on validation half | `63_planner_v2.py:317–318` | Confirmed |
+| Remainder-sample estimand | `63_planner_v2.py:351` `ev = H[perm[T:]]` | Confirmed |
+| Residual model p̂ vs CV rj | `82:66–74` vs `82:91` | Confirmed |
+| oracle = heuristic λ | `83_menu_allocation.py:92` | Confirmed |
+| Gain = SE ratio | `67_ppi_gain.py:66` | Confirmed |
 
-### 2.1 추가 발견: Table 2가 결정적으로 재생성되지 않는다
-커밋된 `05_results/*` 위에서 `84_unify_metrics.py`를 다시 돌리면(저장소 밖 사본에서 확인) 커밋된 `J50.csv`와 **14개 셀이
-다르다** — 예: dbpedia `weighted` 1,990 → 2,100(+5.5%), `ai_resid` 1,610 → 1,602. 원인 둘: (i) 문서 단위 J50의 라벨 환산
-계수 `conv`가 `active_*.csv` 전체 파일의 평균이라 파일이 추가될 때마다 바뀜(비교당 평균 비용 문제의 파생), (ii) 같은
-(collection, judge, method, eps)가 여러 baseline 파일(`_cvl`, `_posthoc` 등)에 있을 때 `drop_duplicates`가 glob 순서에
-의존. README의 "모든 수치 재생성" 주장은 현재 형태로는 성립하지 않는다. Ledger 기반 행별 `docs_labelled`와 파일 명시적
-지정으로 고친다(§3.2에 반영, 파일 지정은 재실행 시).
+### 2.1 Additional finding: Table 2 is not regenerated deterministically
+Rerunning `84_unify_metrics.py` on top of the committed `05_results/*` (verified on a copy outside the repository) gives **14 cells that differ** from the committed `J50.csv`
+— e.g. dbpedia `weighted` 1,990 → 2,100 (+5.5%), `ai_resid` 1,610 → 1,602. Two causes: (i) the label conversion
+factor `conv` for document-level J50 is the mean over all `active_*.csv` files, so it changes whenever a file is added (a derivative of the per-comparison averaged cost problem), (ii) when the same
+(collection, judge, method, eps) exists in several baseline files (`_cvl`, `_posthoc`, etc.), `drop_duplicates` depends on the glob order.
+The README's "all numbers regenerate" claim does not hold in its current form. Fixed via ledger-based per-row `docs_labelled` and explicit file
+specification (reflected in §3.2; file specification at re-run time).
 
-## 3. 오늘 구현·검증한 것 (실데이터 없이 가능한 범위)
+## 3. Implemented and validated today (what is possible without real data)
 
-### 3.1 유한표본 유효 경계 — `lib/certificates.py`
-`ucb_eb`(Maurer–Pontil), `ucb_bet`(betting, predictable plug-in, 고정 n), `ucb_mean_upper(x, δ, lo, hi, method)`,
-`ucb_pairs`, `ht_range`. 전역 `cert.BOUND ∈ {t, eb, bet}`. 자체 테스트에 반례와 coverage 검사 추가(통과).
+### 3.1 Finite-sample valid bounds — `lib/certificates.py`
+`ucb_eb` (Maurer–Pontil), `ucb_bet` (betting, predictable plug-in, fixed n), `ucb_mean_upper(x, δ, lo, hi, method)`,
+`ucb_pairs`, `ht_range`. Global `cert.BOUND ∈ {t, eb, bet}`. Counterexample and coverage checks added to the self-test (pass).
 
-**검정력 비용** (ε=0.01, δ=0.10/30, D∈[−1,1], P(U≤ε)≥0.5가 되는 검증 표본 n):
+**Power cost** (ε=0.01, δ=0.10/30, D∈[−1,1], validation sample size n at which P(U≤ε)≥0.5):
 
 | sd | gap | t | EB | betting |
 |---|---|---|---|---|
@@ -103,167 +103,166 @@ Noisy-but-Valid는 불완전 판정자로 **유한표본** 인증을 한다. 남
 | 0.25 | 0.04 | 220 | >600 | 300 |
 | 0.25 | 0.06 | 100 | >600 | 220 |
 
-→ query 단위에서 정확 보장의 값은 **약 2.5–3배의 검증 query**. 문서 단위(HT 범위)에서는 현재 형태로 인증 불가(§3.2).
+→ At the query level, the price of an exact guarantee is **about 2.5–3× the validation queries**. At the document level (HT range), certification is impossible in the current form (§3.2).
 
-### 3.2 공통 라벨 기록부와 비용 재집계 — `lib/ledger.py`, `81`, `82`, `84`
-- `Ledger`: (query, doc) 고유 라벨만 과금, 중복 비율 진단. 리뷰 예제(20문서, π=0.2 두 비교) 재현: 4 / 8 / **7.2**.
-- `81`, `82` 재작성: 기본값 `--sampling shared`(비교 전체가 한 포함확률 π ∝ Σ_j base_j를 공유), `--pilot_cost full`,
-  `--bound {t,eb,bet}`, `82`는 `--cv_pred {binary,prob}`로 잔차 모델과 CV 예측을 일치. `--legacy`로 구설계 재현.
-  출력 파일에 `_v2_<sampling>_<pilot>_<bound>` 접미사 → lock 결과 파일은 덮어쓰지 않음. 행에 `docs_labelled`(고유 라벨), `docs_pilot`, `dup_frac` 기록.
-- `84`: v2 파일은 행별 `docs_labelled`로 J50 계산, 블록 이름에 `[v2 …]` 표기.
-- 합성 pool(`/tmp/synpools`, 저장소 밖)로 `81`/`82` shared·per_pair·legacy·bet 모두 end-to-end 실행 확인.
-  합성 데이터에서도 pilot(full) ≈ 740 vs 표집 ≈ 400–800 → **pilot이 비용의 절반 이상**.
+### 3.2 Shared label ledger and cost re-accounting — `lib/ledger.py`, `81`, `82`, `84`
+- `Ledger`: charges only unique (query, doc) labels, reports the duplicate fraction as a diagnostic. The review's example (20 documents, two comparisons with π=0.2) reproduced: 4 / 8 / **7.2**.
+- `81`, `82` rewritten: default `--sampling shared` (all comparisons share one inclusion probability π ∝ Σ_j base_j), `--pilot_cost full`,
+  `--bound {t,eb,bet}`; `82` aligns the residual model and the CV prediction via `--cv_pred {binary,prob}`. `--legacy` reproduces the old design.
+  Output files carry the suffix `_v2_<sampling>_<pilot>_<bound>` → lock result files are not overwritten. Rows record `docs_labelled` (unique labels), `docs_pilot`, `dup_frac`.
+- `84`: for v2 files, J50 is computed from per-row `docs_labelled`, and block names are marked `[v2 …]`.
+- Verified end-to-end runs of `81`/`82` in shared, per_pair, legacy and bet modes on synthetic pools (`/tmp/synpools`, outside the repository).
+  Even on synthetic data, pilot(full) ≈ 740 vs. sampling ≈ 400–800 → **the pilot is more than half of the cost**.
 
 ### 3.3 `63`, `67`
-- `63`: `--cand_on {val,train}`, `--truth {remainder,population}`, `--bound` 추가(기본값은 사전등록 그대로; 출력 디렉터리에 접미사).
-- `67`: `mc_var_*`, `mc_mse_*`, `mc_gain`(MSE 비), `cover90_*` 열 추가.
+- `63`: added `--cand_on {val,train}`, `--truth {remainder,population}`, `--bound` (defaults unchanged from pre-registration; suffix on the output directory).
+- `67`: added columns `mc_var_*`, `mc_mse_*`, `mc_gain` (MSE ratio), `cover90_*`.
 
-### 3.4 정확 oracle 배분 — `lib/design.py`
-min_π max_j V_j(π)/s_j² s.t. Σcπ ≤ B 를 쌍대(θ ∈ simplex, water-filling 닫힌 해, exponentiated gradient)로 풂.
-자체 테스트: J=1이면 π ∝ |a|√v로 환원; 구성 예제에서 정적 합산 대비 68×, 겹침 예제에서 1.00×. `83`에 `oracle_exact` arm으로
-연결하는 것은 데이터 실행과 함께 진행.
+### 3.4 Exact oracle allocation — `lib/design.py`
+Solves min_π max_j V_j(π)/s_j² s.t. Σcπ ≤ B via the dual (θ ∈ simplex, closed-form water-filling, exponentiated gradient).
+Self-test: for J=1 it reduces to π ∝ |a|√v; 68× over static summation on the constructed example, 1.00× on the overlapping example. Wiring it into `83` as the `oracle_exact` arm
+proceeds together with the data runs.
 
-### 3.5 문헌
-리뷰가 든 5편을 확인해 `02_literature` Batch 4에 추가(저자·venue·arXiv 번호), 환원 검토용 linear-BAI 3편은 미검증으로 표기.
+### 3.5 Literature
+Verified the 5 papers the review cited and added them to `02_literature` Batch 4 (authors, venue, arXiv numbers); the 3 linear-BAI papers for the reduction check are marked unverified.
 
-## 4. 데이터가 있어야 하는 것 (재실행 목록)
+## 4. What requires data (re-run list)
 
-저장소에는 `05_results`의 집계 CSV만 있고 pool(`<pools>/<stack>/runs/candidates/*.csv`, `*_meta.csv`, `*_llm.csv`,
-`*_mistral.csv`, `*_mpnet.csv`)이 없다. 아래는 pool이 오면 바로 돌릴 수 있다(GPU 불필요, 판정은 CSV에 캐시됨):
+The repository has only the aggregate CSVs in `05_results`; the pools (`<pools>/<stack>/runs/candidates/*.csv`, `*_meta.csv`, `*_llm.csv`,
+`*_mistral.csv`, `*_mpnet.csv`) are absent. The following can run as soon as the pools arrive (no GPU needed; judgments are cached in the CSVs):
 
-1. `81`/`82` v2 (shared·full·t) × {dbpedia, dl212223, cast, antique} × {llm, rr, inv} → Table 2 재생성, 절감률 재계산.
-2. 같은 것을 `--bound bet`로 → "문서 단위 유한표본 인증의 현재 비용"(예상: 대부분 미도달) 기록.
-3. `63 --cand_on train`, `--truth population`, `--bound bet` × 사전등록 3 collection → Prop. B 재작성 근거·비용.
-4. `67` 재실행 → MC-MSE 이득·coverage로 F4 재작성.
-5. `83` + `oracle_exact` → **go/no-go 실험**(§6).
+1. `81`/`82` v2 (shared, full, t) × {dbpedia, dl212223, cast, antique} × {llm, rr, inv} → regenerate Table 2, recompute savings.
+2. The same with `--bound bet` → record "the current cost of document-level finite-sample certification" (expected: mostly not reached).
+3. `63 --cand_on train`, `--truth population`, `--bound bet` × the 3 pre-registered collections → basis and cost for rewriting Prop. B.
+4. Re-run `67` → rewrite F4 with MC-MSE gain and coverage.
+5. `83` + `oracle_exact` → **go/no-go experiment** (§6).
 
-## 5. Featured로 가는 기여 후보 (내 순위)
+## 5. Candidate contributions for Featured (my ranking)
 
-1. **메뉴 동시 인증의 최적 설계와 그것을 회수하는 절차** — 정확 oracle 격차가 크면(§6 기준) 주 기여. 이론은 linear-BAI
-   XY-design의 Bernoulli·이질 비용·ε-인증 특수화 + 유한표본 정지 규칙.
-2. **문서 단위 유한표본 인증** — HT 범위 문제를 피하는 추정량(예: 문서별 bounded 증분에 대한 betting martingale, 또는
-   π 하한 + 절단 + 편향 보정)과 그 비용. 지금은 아무도 못 하는 것을 하는 결과가 되므로 1과 결합 시 강함.
-3. 판정자 가치 = ρ (No Free Lunch 이후에는 보조 결과로 강등), 자기선호 실측(보조).
+1. **Optimal design for simultaneous menu certification and a procedure that recovers it** — the main contribution if the exact oracle gap is large (by the §6 criterion). The theory is the
+   Bernoulli / heterogeneous-cost / ε-certification specialisation of linear-BAI XY-design + a finite-sample stopping rule.
+2. **Document-level finite-sample certification** — an estimator that avoids the HT-range problem (e.g. a betting martingale over bounded per-document increments, or
+   a lower bound on π + truncation + bias correction) and its cost. This would be a result nobody can currently achieve, so it is strong when combined with 1.
+3. Judge value = ρ (demoted to an auxiliary result after No Free Lunch), empirical measurement of self-preference (auxiliary).
 
-## 6. 결정 요청 (한 번에)
+## 6. Decisions requested (all at once)
 
-1. **데이터 전달**: pool 디렉터리(candidates CSV + 판정자 side file) 전체를 어떻게 줄지 — private repo(토큰), 압축 파일, 클라우드 경로? 대략 용량은?
-   GPU는 재실행에 불필요. 새 pool(§1.7)을 만들 때만 필요 — GPU 접근 가능한가?
-2. **인증 보장 노선**: (a) 유한표본 정확(betting)을 주 결과로 하고 t는 "점근 참고"로 강등 / (b) 점근 보장을 명시하고
-   "asymptotic certificate"로 용어를 낮춤 / (c) 둘 다 보고. **내 추천: (c) + 유한모집단 estimand**(§1.1의 PPI 정확화 포함).
-3. **estimand**: 전체 N 유한모집단 평균으로 통일하고 LOCK v0.4 표에 잔여 평균 값을 병기 — 동의하는가?
-4. **후보 선택**: 코드 유지 + Prop. B 재작성(내 추천) vs 코드를 훈련 반쪽 선택으로 변경. 둘 다 실행해 효율 비교는 어차피 함.
-5. **pilot 비용**: (a) pool 전체를 정직하게 과금 / (b) precision 메뉴에서 nG가 필요 없도록 pilot을 재설계(예: gate 정책의
-   c를 HT 부분표본으로 추정, 또는 precision 실험에서 gate 정책 제외). (a)는 즉시 가능, (b)는 방법 변경. **추천: (a)로 먼저 재계산하고 (b)는 결과 보고 결정.**
-6. **go/no-go 기준**: 정확 oracle(참 격차·참 잔차 사용)이 정적 합산+CV 대비 J50을 **≥ 30% 줄이는 collection이 2개 이상**이면
-   방향 1에 투자, 아니면 방향 2(문서 단위 유한표본 인증)로 전환 — 이 문턱에 동의하는가? 다른 숫자를 원하는가?
-7. **사전등록 결과 처리**: v0.4–v0.6 수치는 그대로 두고 "revised accounting" 절을 따로 두는 것 — 확인.
-8. **원고 문구**: 재계산 전까지 "halves the human judgments", "certificate valid for any judge"를 초록·서론에서 내리고
-   조건부 표현으로 바꾸는 작업을 지금 할지, 재계산 후 한 번에 할지.
-9. **GitHub**: push 대상 브랜치(제안: `featured-prep`, main은 e0609ea 그대로 보존), 그리고 lock 문서의 커밋 타임스탬프 증거(§SUBMISSION_CHECKLIST 4)를 어떻게 남길지.
+1. **Data delivery**: how to deliver the entire pool directory (candidates CSVs + judge side files) — private repo (token), archive, cloud path? Approximate size?
+   No GPU is needed for the re-runs. It is needed only to build new pools (§1.7) — is GPU access available?
+2. **Certificate guarantee track**: (a) finite-sample exact (betting) as the main result, with t demoted to an "asymptotic reference" / (b) state the asymptotic guarantee explicitly and
+   lower the terminology to "asymptotic certificate" / (c) report both. **My recommendation: (c) + finite-population estimand** (including the exact PPI of §1.1).
+3. **Estimand**: unify as the full-N finite-population mean and report the remainder-mean values alongside in the LOCK v0.4 tables — agreed?
+4. **Candidate selection**: keep the code + rewrite Prop. B (my recommendation) vs. change the code to training-half selection. Both will be run for the efficiency comparison anyway.
+5. **Pilot cost**: (a) honestly charge the whole pool / (b) redesign the pilot so that nG is not needed in the precision menu (e.g. estimate the gate policy's
+   c from an HT subsample, or exclude gate policies from the precision experiment). (a) is possible immediately, (b) is a change of method. **Recommendation: recompute with (a) first and decide (b) after seeing the results.**
+6. **Go/no-go criterion**: invest in direction 1 if the exact oracle (using true gaps and true residuals) reduces J50 **by ≥ 30% relative to static summation+CV on 2 or more collections**,
+   otherwise switch to direction 2 (document-level finite-sample certification) — do you agree with this threshold? Do you want a different number?
+7. **Handling pre-registered results**: keep the v0.4–v0.6 numbers as they are and add a separate "revised accounting" section — confirm.
+8. **Manuscript wording**: whether to remove "halves the human judgments" and "certificate valid for any judge" from the abstract and introduction now and replace them with
+   conditional wording, or do it all at once after recomputation.
+9. **GitHub**: target branch for the push (proposal: `featured-prep`, main kept exactly at e0609ea), and how to leave the commit-timestamp evidence for the lock documents (§SUBMISSION_CHECKLIST 4).
 
-## 7. 오늘의 변경 파일
+## 7. Files changed today
 
-- 수정: `04_code/lib/certificates.py`, `04_code/63_planner_v2.py`, `04_code/67_ppi_gain.py`, `04_code/81_sampling_baselines.py`,
+- Modified: `04_code/lib/certificates.py`, `04_code/63_planner_v2.py`, `04_code/67_ppi_gain.py`, `04_code/81_sampling_baselines.py`,
   `04_code/82_active_inference.py`, `04_code/84_unify_metrics.py`, `02_literature/references_verified_2026-08-25.md`
-- 신규: `04_code/lib/ledger.py`, `04_code/lib/design.py`, 이 문서
-- 기존 `05_results/*` 파일은 변경하지 않았음(합성 테스트 출력은 삭제). 이전 세션의 `main.tex` 소폭 수정과 `SUBMISSION_CHECKLIST.md`는 그대로.
+- New: `04_code/lib/ledger.py`, `04_code/lib/design.py`, this document
+- The existing `05_results/*` files were not changed (synthetic test outputs deleted). The previous session's minor `main.tex` edits and `SUBMISSION_CHECKLIST.md` are unchanged.
 
 ---
 
-## 8. 결정 (2026-09-14 오후, 승인됨) — §6의 9개 항목에 대한 확정
+## 8. Decisions (2026-09-14 afternoon, approved) — final on the 9 items of §6
 
-| # | 결정 | 구현 상태 |
+| # | Decision | Implementation status |
 |---|---|---|
-| 1 | pool은 압축 bundle(`pools_bundle/MANIFEST.csv`, `README_DATA.md`, `<stack>/runs/candidates/…`)로 Drive/채팅 전달. PAT 전달 없음. | `04_code/92_pools_manifest.py build|verify` 작성. **bundle에 학습 pool `legacy/{nfcorpus,scifact,arguana,cqadupstack-android}`도 반드시 포함**(LODO 관련성 모델이 읽음). |
-| 2 | (c) 둘 다 보고하되 **finite-sample exact(betting/EB)를 main claim**, t는 "asymptotic/diagnostic benchmark"로 강등. | 원고 문구 반영(§9). 결과는 `--bound bet`·`--bound t` 병행 실행. |
-| 3 | estimand = 전체 N finite-population mean. remainder는 historical reproduction으로만. | `63 --truth population` 준비됨. |
-| 4 | `cand_on=val` 유지 + Prop. B를 "simultaneous coverage of the fixed M(M−1) family" 형태로 재작성. **family는 validation을 보고 확장되지 않는다**는 조건 명시. `train` 선택은 효율 ablation. | `main.tex` Prop. B·부록 증명 재작성 완료. |
-| 5 | pilot은 실제 사용한 전체 라벨 100% 과금(a). 재설계는 결과를 본 뒤. | `81/82/83 --pilot_cost full` 기본값. `85_gates.py`가 `pilot_share` 보고. |
-| 6 | Gate A + Gate B 2단계(아래). | `85_gates.py`. |
-| 7 | v0.4–v0.6 수치 immutable, "legacy/preregistered; superseded for cost conclusions" 명시. | Table 2 caption·Limitations에 반영. v2 결과는 `_v2_*` 파일로 분리. |
-| 8 | 원고 문구 즉시 수정. | 완료(§9). |
-| 9 | `main`=e0609ea 보존, `featured-prep` branch, annotated tag `lock-e0609ea-2026-09-14`, Release 첨부(SHA256SUMS 등). | 로컬 tag·branch 생성. `03_data/LOCK_ARTIFACTS_e0609ea/`(MANIFEST 244 files, SHA256SUMS, archive sha). Release 첨부물은 `/workspace/release_staging/lock-e0609ea-2026-09-14/`에 준비 — push·Release 생성은 계정 권한 필요. Zenodo/OSF snapshot 권장. |
+| 1 | Pools delivered as a compressed bundle (`pools_bundle/MANIFEST.csv`, `README_DATA.md`, `<stack>/runs/candidates/…`) via Drive/chat. No PAT handover. | `04_code/92_pools_manifest.py build|verify` written. **The bundle must also include the training pools `legacy/{nfcorpus,scifact,arguana,cqadupstack-android}`** (read by the LODO relevance model). |
+| 2 | (c) report both, but **finite-sample exact (betting/EB) is the main claim**; t demoted to an "asymptotic/diagnostic benchmark". | Manuscript wording updated (§9). Results run with both `--bound bet` and `--bound t`. |
+| 3 | estimand = full-N finite-population mean. Remainder only as a historical reproduction. | `63 --truth population` ready. |
+| 4 | Keep `cand_on=val` + rewrite Prop. B in the form "simultaneous coverage of the fixed M(M−1) family". State explicitly the condition that **the family is not expanded after looking at the validation data**. `train` selection is an efficiency ablation. | `main.tex` Prop. B and appendix proof rewritten. |
+| 5 | The pilot is charged 100% of the labels actually used (a). Redesign after seeing results. | `81/82/83 --pilot_cost full` is the default. `85_gates.py` reports `pilot_share`. |
+| 6 | Two-stage Gate A + Gate B (below). | `85_gates.py`. |
+| 7 | v0.4–v0.6 numbers immutable, marked "legacy/preregistered; superseded for cost conclusions". | Reflected in the Table 2 caption and Limitations. v2 results separated into `_v2_*` files. |
+| 8 | Manuscript wording fixed immediately. | Done (§9). |
+| 9 | `main`=e0609ea preserved, `featured-prep` branch, annotated tag `lock-e0609ea-2026-09-14`, Release attachments (SHA256SUMS etc.). | Local tag and branch created. `03_data/LOCK_ARTIFACTS_e0609ea/` (MANIFEST 244 files, SHA256SUMS, archive sha). Release attachments staged in `/workspace/release_staging/lock-e0609ea-2026-09-14/` — push and Release creation require account permissions. Zenodo/OSF snapshot recommended. |
 
-### 8.1 Go/No-Go — 두 단계
+### 8.1 Go/No-Go — two stages
 
-모든 accounting 수정(shared ledger, pilot full cost) + 모든 arm에 동일 certificate를 적용한 상태에서, `85_gates.py`가 계산:
+With all accounting fixes applied (shared ledger, pilot full cost) and the same certificate applied to every arm, `85_gates.py` computes:
 
-- **Gate A (구조적 head-room)**: `saving_oracle = 1 − J50(oracle_exact)/J50(static_sum)` 이
-  **≥ 30%인 collection ≥ 2개** *그리고* **4 collection median ≥ 20%**.
-  median 조건은 non-overlap이 극단적인 두 collection만으로 통과하는 것을 막기 위함.
-- **Gate B (회수 가능성)**: oracle을 모르는 절차(`plugin_exact`: pilot·누적 추정치에서 s_j, pilot 잔차 모델에서 v̂)가
-  `recovery = (J50_static − J50_plugin)/(J50_static − J50_oracle)` **≥ 60%**, 실제 절감 `saving_plugin` **≥ 15–20%가 2 collection 이상**,
-  그리고 plugin의 wrong-certificate rate ≤ α 유지.
-- 판정: A pass + B pass → 방향 1 강하게 진행. A fail → 방향 1 주 기여 접음. A pass + B fail → algorithmic gap이 연구문제, Featured 주장은 보류.
+- **Gate A (structural head-room)**: `saving_oracle = 1 − J50(oracle_exact)/J50(static_sum)` is
+  **≥ 30% on ≥ 2 collections** *and* **the median over the 4 collections is ≥ 20%**.
+  The median condition prevents passing on only the two collections with extreme non-overlap.
+- **Gate B (recoverability)**: a procedure that does not know the oracle (`plugin_exact`: s_j from the pilot and cumulative estimates, v̂ from the pilot residual model) achieves
+  `recovery = (J50_static − J50_plugin)/(J50_static − J50_oracle)` **≥ 60%**, actual saving `saving_plugin` **≥ 15–20% on 2 or more collections**,
+  and the plugin's wrong-certificate rate stays ≤ α.
+- Verdict: A pass + B pass → proceed strongly with direction 1. A fail → drop direction 1 as the main contribution. A pass + B fail → the algorithmic gap is the research problem; the Featured claim is on hold.
 
-`85_gates.py --baseline static_sum_v`도 함께 본다: `static_sum_v`(π ∝ Σ|w_j|·√v̂)는 분산 인지 정적 규칙이라, 그것과 oracle의 차이가
-**메뉴 설계 자체**의 head-room이고, `static_sum`과의 차이는 분산 인지 + 메뉴 설계의 합이다. Gate A의 공식 baseline은 결정대로 `static_sum`.
+`85_gates.py --baseline static_sum_v` is also examined: `static_sum_v` (π ∝ Σ|w_j|·√v̂) is a variance-aware static rule, so its difference from the oracle is
+the head-room of **menu design itself**, while the difference from `static_sum` is the sum of variance awareness + menu design. Gate A's official baseline is `static_sum`, as decided.
 
-### 8.2 `83_menu_allocation.py` v2 (오늘 구현)
+### 8.2 `83_menu_allocation.py` v2 (implemented today)
 
-- arm 추가: `static_sum_v`, `oracle_exact`, `plugin_exact`. oracle은 **참 slack s_j와 모집단 잔차분산 함수 v(p)=E[(y−ĵ)²|judge-prob bin]** 을
-  알되 라벨은 모른다(문서별 참 잔차를 쓰면 라벨을 아는 oracle이 되어 메뉴 설계의 이득과 분리되지 않음). plugin은 같은 설계를
-  pilot(1라운드)·누적 추정치(이후)에서 s_j, pilot 잔차 모델에서 v̂(floor 0.02, 모든 결정 문서에 π>0 보장)로 푼다.
-- 설계는 라운드의 모든 문서에 대해 한 번에(문서 수천, J=3, 150 EG 반복) 풂; 라운드 예산은 정적 arm과 동일(Σπ 일치).
-- Ledger 과금, `--pilot_cost`, `--bound`, `design_obj`(참 v·s에서 각 arm의 realised max_j V_j/s_j² — bound 무관한 구조적 head-room), `--legacy`.
-- 발견: 구 `per_pair`는 query당 3b 문서를 뽑아 실제 고유 라벨이 공유 arm의 2배 이상이었음(ledger로 드러남). v2는 b로 균등화.
-- 합성 pool smoke test 통과: 비용 균등(≈1,195 vs 1,195), `design_obj` static/oracle_exact 1.7–2.2×, plugin이 그 사이. 실데이터 수치는 아님.
+- Arms added: `static_sum_v`, `oracle_exact`, `plugin_exact`. The oracle **knows the true slack s_j and the population residual-variance function v(p)=E[(y−ĵ)²|judge-prob bin]**
+  but not the labels (using the true per-document residuals would make it a label-knowing oracle, inseparable from the gain of menu design). The plugin solves the same design with
+  s_j from the pilot (round 1) and cumulative estimates (thereafter), and v̂ from the pilot residual model (floor 0.02, guaranteeing π>0 for every decision document).
+- The design is solved at once for all documents of a round (thousands of documents, J=3, 150 EG iterations); the round budget equals that of the static arms (Σπ matched).
+- Ledger charging, `--pilot_cost`, `--bound`, `design_obj` (each arm's realised max_j V_j/s_j² under the true v and s — structural head-room independent of the bound), `--legacy`.
+- Finding: the old `per_pair` drew 3b documents per query, so its actual unique labels were more than twice those of the shared arm (revealed by the ledger). v2 equalises to b.
+- Synthetic pool smoke test passed: costs equalised (≈1,195 vs 1,195), `design_obj` static/oracle_exact 1.7–2.2×, plugin in between. These are not real-data numbers.
 
-### 8.3 방향 1의 novelty bar (사용자 경고 반영)
+### 8.3 The novelty bar for direction 1 (reflecting the user's warning)
 
-min_π max_j V_j(π)/s_j² 는 transductive linear-bandit design(Soare et al. 2014; Fiez et al. 2019)과 닮았고, 더 직접적으로
-**Ochoa Rivera & Tewari (2024) "Optimal Thresholding Linear Bandit"(arXiv:2402.09467)** 이 fixed-confidence ε-thresholding linear
-bandit의 sample-complexity lower bound와 asymptotically optimal algorithm(Lazy Track-Threshold-and-Stop)을 이미 제시한다 — 확인함.
-따라서 "menu certification을 optimal design으로 푼다"만으로는 "thresholding linear pure-exploration with a specialised design matrix"로
-환원된다. Featured 기여가 되려면 세 층이 모두 필요:
-1. 관측 모델이 다름 — expensive gold + cheap judge prediction, rectifier Y_i − λŶ_i 가 여러 contrast에 동시에 들어감(MultiPPI의
-   multi-source 자원배분과도 구별되어야 함).
-2. finite-sample certification이 핵심(asymptotic normal stopping rule 이식은 약함).
-3. oracle complexity C* 정의 + adaptive procedure의 C_alg ≤ c·C*·polylog 또는 empirical recovery(Gate B).
-잠정 제목: **Exact, Cost-Aware Certification of Decision Menus with Imperfect Automated Judges**. 핵심 theorem 사슬:
+min_π max_j V_j(π)/s_j² resembles transductive linear-bandit design (Soare et al. 2014; Fiez et al. 2019), and more directly
+**Ochoa Rivera & Tewari (2024) "Optimal Thresholding Linear Bandit" (arXiv:2402.09467)** already gives a sample-complexity lower bound and an asymptotically optimal algorithm
+(Lazy Track-Threshold-and-Stop) for the fixed-confidence ε-thresholding linear bandit — verified.
+Therefore "solving menu certification as an optimal design" alone reduces to "thresholding linear pure-exploration with a specialised design matrix".
+For a Featured contribution, all three layers are needed:
+1. A different observation model — expensive gold + cheap judge prediction, with the rectifier Y_i − λŶ_i entering several contrasts simultaneously (must also be distinguished from MultiPPI's
+   multi-source resource allocation).
+2. Finite-sample certification as the core (porting an asymptotic normal stopping rule is weak).
+3. A definition of the oracle complexity C* + C_alg ≤ c·C*·polylog for the adaptive procedure, or empirical recovery (Gate B).
+Tentative title: **Exact, Cost-Aware Certification of Decision Menus with Imperfect Automated Judges**. Core theorem chain:
 oracle design → adaptive realisable design → finite-sample-valid stopping.
 
-### 8.4 방향 2의 표현 수정
+### 8.4 Corrected framing of direction 2
 
-"문서 단위 유한표본 인증 — 아무도 못 하는 것"은 틀림: Waudby-Smith & Ramdas (NeurIPS 2020)가 finite population WoR에 대한
-time-uniform CS를 이미 제공. 실제 발견한 어려움은 **unequal/adaptive inclusion probabilities + HT weighting + multiple shared linear
-contrasts + prediction-powered residuals에서 실용적 폭의 exact certificate**. 질문: *Can exact finite-sample validity coexist with
-aggressive importance sampling?* Query 단위 단순 WoR + finite-population decomposition(μ_N = 알려진 λ·mean(Ŷ) + bounded rectifier 평균)은
-betting/CS와 자연스럽게 결합하지만, document-level adaptive unequal sampling으로의 확장은 자동이 아니며 거기부터가 연구문제.
+"Document-level finite-sample certification — something nobody can do" is wrong: Waudby-Smith & Ramdas (NeurIPS 2020) already provide
+time-uniform CSs for finite-population WoR sampling. The difficulty actually found is **an exact certificate of practical width under unequal/adaptive inclusion probabilities + HT weighting + multiple shared linear
+contrasts + prediction-powered residuals**. The question: *Can exact finite-sample validity coexist with
+aggressive importance sampling?* Query-level simple WoR + finite-population decomposition (μ_N = known λ·mean(Ŷ) + bounded rectifier mean)
+combines naturally with betting/CS, but the extension to document-level adaptive unequal sampling is not automatic, and that is where the research problem begins.
 
-### 8.5 pilot 비용의 세 경우 (재계산 후 판독 기준)
+### 8.5 Three cases for pilot cost (criteria for reading the results after recomputation)
 
-(i) 정직 과금 후에도 saving 큼 → pilot 재설계 불필요. (ii) pilot이 비용의 50%+이지만 saving 잔존 → "how much pilot information is
-actually required?"가 두 번째 기여. (iii) pilot이 saving을 거의 전부 소모 → 현재 절차의 practical claim 붕괴, n_G를 full pool에서
-읽는 구조를 바꿔야 함. 합성 데이터에서 pilot_share ≈ 0.53이므로 (ii)/(iii) 가능성을 열어둠.
+(i) Saving remains large even after honest charging → no pilot redesign needed. (ii) The pilot is 50%+ of the cost but saving remains → "how much pilot information is
+actually required?" becomes the second contribution. (iii) The pilot consumes almost all of the saving → the practical claim of the current procedure collapses, and the structure that reads n_G from the full pool
+must change. On synthetic data pilot_share ≈ 0.53, so (ii)/(iii) are left open as possibilities.
 
-## 9. 원고 즉시 수정 (완료, `main.tex` 재컴파일 14쪽, 경고 없음)
+## 9. Immediate manuscript fixes (done, `main.tex` recompiled to 14 pages, no warnings)
 
-- 초록 (ii): "remains valid for any judge" → 판정자가 bound를 편향시킬 수 없음 + "asymptotically calibrated under the pre-registered
+- Abstract (ii): "remains valid for any judge" → the judge cannot bias the bound + "asymptotically calibrated under the pre-registered
   t-based implementation; finite-sample-valid certificates are developed separately".
-- 초록 (iii)·마지막 문장: "cuts … by more than half"/"halved" → "under the original per-comparison cost accounting, substantially reduced …;
+- Abstract (iii) and last sentence: "cuts … by more than half"/"halved" → "under the original per-comparison cost accounting, substantially reduced …;
   a revised accounting that charges every unique human label once, including the full pilot, is evaluated separately and supersedes
   the original for cost conclusions".
-- 기여 2 제목 "A certificate that is valid for any judge" → "A certificate whose bias does not depend on the judge"(§4 제목도 동일).
-- Prop. B: simultaneous coverage 형태로 재작성(fixed family 조건, t의 유한표본 반례 D=1 w.p. 0.02·n=30·55%, EB/betting이 의도된 대체).
-  부록 증명도 event E 기반으로 재작성.
-- Table 2 caption·§5 첫 reading·Related work·Limitations·결론에 legacy accounting/asymptotic bound 명시.
-- `refs.bib`에 waudby2024estimating, waudby2020wor, ochoa2024thresholding, fiez2019transductive, soare2014linear 추가.
+- Contribution 2 title "A certificate that is valid for any judge" → "A certificate whose bias does not depend on the judge" (§4 title likewise).
+- Prop. B: rewritten in simultaneous-coverage form (fixed-family condition, the finite-sample counterexample for t D=1 w.p. 0.02, n=30, 55%, EB/betting as the intended replacement).
+  The appendix proof also rewritten on the basis of event E.
+- Legacy accounting/asymptotic bound stated explicitly in the Table 2 caption, the first reading of §5, Related work, Limitations and the conclusion.
+- Added waudby2024estimating, waudby2020wor, ochoa2024thresholding, fiez2019transductive, soare2014linear to `refs.bib`.
 
-## 10. 실행 환경 점검 (RunPod, 2026-09-14)
+## 10. Execution environment check (RunPod, 2026-09-14)
 
-- GPU: RTX 3090 24 GB(CUDA 13.0 driver, torch 2.4.1+cu124 CUDA 사용 가능), CPU 256 threads, RAM 1 TB.
-- 디스크: 컨테이너 overlay 200 GB(199 GB 여유, 재시작 시 비영속 가능) / `/workspace` 네트워크 볼륨(영속). pool bundle·HF cache·로그는 `/workspace`에.
-- 설치: transformers(≥4.51), sentence-transformers, bm25s, accelerate 추가 설치 완료(새 pool/판정 생성 시 필요; 81–85 재실행은 GPU 불필요).
-- 실행 스크립트: `04_code/RUN_REVISED_ACCOUNTING.sh` (`POOLS`, `TRAIN_DIR` 환경변수) — 81/82/83 v2 × 4 collection × judge × {t, bet}을 병렬 실행 후 84·85.
-  예상 시간: 83 v2 300 draws 기준 collection당 약 1시간(단일 프로세스), 전체는 병렬로 수 시간.
+- GPU: RTX 3090 24 GB (CUDA 13.0 driver, torch 2.4.1+cu124 with CUDA available), CPU 256 threads, RAM 1 TB.
+- Disk: container overlay 200 GB (199 GB free, possibly non-persistent across restarts) / `/workspace` network volume (persistent). Pool bundle, HF cache and logs go in `/workspace`.
+- Installed: transformers (≥4.51), sentence-transformers, bm25s, accelerate additionally installed (needed for generating new pools/judgments; re-running 81–85 needs no GPU).
+- Run script: `04_code/RUN_REVISED_ACCOUNTING.sh` (`POOLS`, `TRAIN_DIR` environment variables) — runs 81/82/83 v2 × 4 collections × judge × {t, bet} in parallel, then 84 and 85.
+  Expected time: about 1 hour per collection for 83 v2 at 300 draws (single process); the whole run takes several hours in parallel.
+## 11. Recomputed results — Gate A/B verdict (2026-09-14 21:15 KST, regenerated pools, 300 draws)
 
-## 11. 재계산 결과 — Gate A/B 판정 (2026-09-14 21:15 KST, 재생성 pool, 300 draws)
-
-실행: `81/82/83 --pilot_cost full --sampling shared` × {dbpedia-entity, dl212223, cast19, antique} × {llm, rr, inv} × {t, bet}.
-83은 `OMP_NUM_THREADS=1` + `lib/design.py`의 닫힌 형태 water-filling(정렬 O(n log n), 이분탐색 구현과 200 인스턴스에서 1e-6 일치)으로
-collection당 약 25분. 출력: `05_results/menu_allocation/menu_alloc_*_v2_full_{t,bet}.csv`, `05_results/unified/gates_*.csv`.
+Runs: `81/82/83 --pilot_cost full --sampling shared` × {dbpedia-entity, dl212223, cast19, antique} × {llm, rr, inv} × {t, bet}.
+83 takes about 25 minutes per collection with `OMP_NUM_THREADS=1` + the closed-form water-filling in `lib/design.py` (sort, O(n log n); agrees with the bisection implementation to 1e-6 on 200 instances).
+Outputs: `05_results/menu_allocation/menu_alloc_*_v2_full_{t,bet}.csv`, `05_results/unified/gates_*.csv`.
 
 ### 11.1 Gate A — FAIL (t bound, baseline `static_sum`)
 
@@ -272,42 +271,42 @@ collection당 약 25분. 출력: `05_results/menu_allocation/menu_alloc_*_v2_ful
 | dl212223 | 0.01 | 2930 | 2543 | 2663 | **13.2%** | 9.1% | 0.69 | 2.47 | 0.82 | 0.38 |
 | dbpedia-entity | 0.01 | 3100 | 2962 | 3191 | 4.4% | −2.9% | — | 1.55 | 0.55 | 0.40 |
 | dbpedia-entity | 0.02 | 2420 | 2351 | 2352 | 2.9% | 2.8% | 0.98 | 1.56 | 0.55 | 0.40 |
-| antique | 0.01/0.02 | 최소 예산(30q)에서 이미 인증률 > 0.5 → J50 left-censored, 절감 측정 불가(≈0%) | | | | | | 1.94 | 0.58 | 0.27 |
-| dl212223 | 0.02 | 최소 예산(20q)에서 0.56 → left-censored | | | | | | 2.44 | 0.82 | 0.38 |
-| cast19 | 둘 다 | 모든 arm 인증률 ≤ 0.11 (예산 90q까지) → J50 미도달 | | | | | | 1.9–2.1 | 0.60 | 0.38 |
+| antique | 0.01/0.02 | certification rate already > 0.5 at the minimum budget (30q) → J50 left-censored, saving not measurable (≈0%) | | | | | | 1.94 | 0.58 | 0.27 |
+| dl212223 | 0.02 | 0.56 at the minimum budget (20q) → left-censored | | | | | | 2.44 | 0.82 | 0.38 |
+| cast19 | both | certification rate ≤ 0.11 for every arm (up to budget 90q) → J50 not reached | | | | | | 1.9–2.1 | 0.60 | 0.38 |
 
-- 유일하게 검열되지 않은 "유리한" 사례(dl212223, nonoverlap 0.82, eps=0.01)에서도 oracle 절감 13%(pilot 제외 25%), 문턱 30%에 크게 못 미침.
-  두 번째 collection은 없다. median도 20% 미만. **Gate A 실패 — 방향 1(메뉴 최적 설계)을 Featured 주 기여로 삼지 않는다.**
-- 구조적 신호와 인증률 신호의 괴리: 설계 목적함수 max_j V_j/s_j² 기준으로는 oracle이 static_sum보다 1.5–2.5배 좋지만, 인증률 곡선은
-  낮은 예산에서만 갈라진다(dl212223 B=20q: 0.39→0.51, B=30q: 0.55→0.71)가 예산이 커지면 모든 arm이 같은 plateau(0.66–0.85)에 붙는다.
-  plateau는 인증 불가능한 메뉴(참 regret이 eps 근처 또는 초과)의 비율이 정하므로 설계로 넘을 수 없다. 즉 head-room은 "저예산 구간"에 국한된다.
-- pilot이 고유 라벨의 27–40%(§8.5의 경우 (ii)): 절감을 희석하지만 그것을 빼도 30%는 안 된다.
-- `static_sum_v`(분산 인지 정적) 대비로도 oracle 절감은 dbpedia 6.6%, 나머지 ≈0 — 메뉴 설계 자체의 head-room이 작다.
-- 정합성: `plugin_exact`의 wrong-certificate rate는 모든 블록에서 0.000; `per_pair`(예산 균등화 후)는 모든 arm 중 최하.
+- Even in the only uncensored "favourable" case (dl212223, nonoverlap 0.82, eps=0.01), the oracle saving is 13% (25% excluding the pilot), far short of the 30% threshold.
+  There is no second collection. The median is also below 20%. **Gate A fails — direction 1 (optimal menu design) is not adopted as the main Featured contribution.**
+- Gap between the structural signal and the certification-rate signal: on the design objective max_j V_j/s_j² the oracle is 1.5–2.5× better than static_sum, but the certification-rate curves
+  separate only at low budgets (dl212223 B=20q: 0.39→0.51, B=30q: 0.55→0.71); as the budget grows, every arm attaches to the same plateau (0.66–0.85).
+  The plateau is set by the fraction of uncertifiable menus (true regret near or above eps), so no design can cross it. That is, the head-room is confined to the "low-budget regime".
+- The pilot is 27–40% of the unique labels (case (ii) of §8.5): it dilutes the saving, but even after removing it the saving does not reach 30%.
+- Relative to `static_sum_v` (variance-aware static), the oracle saving is 6.6% on dbpedia and ≈0 elsewhere — the head-room of menu design itself is small.
+- Consistency: the wrong-certificate rate of `plugin_exact` is 0.000 in every block; `per_pair` (after budget equalisation) is the lowest of all arms.
 
-### 11.2 `--bound bet` — 문서 단위 유한표본 인증은 현재 형태로는 도달 불가
+### 11.2 `--bound bet` — document-level finite-sample certification is not reachable in its current form
 
-모든 collection·예산·arm에서 betting 상한의 인증률 0.00–0.013. HT 가중 증분의 범위가 커서 상한이 eps 안으로 들어오지 않음 —
-§8.4에서 예상한 그대로. 이 사실 자체가 방향 2의 문제 정의(aggressive importance sampling + exact validity 공존)를 실증한다.
+Across every collection, budget and arm, the certification rate of the betting upper bound is 0.00–0.013. The range of the HT-weighted increments is so large that the bound does not enter eps —
+exactly as anticipated in §8.4. This fact itself gives empirical evidence for the problem statement of direction 2 (coexistence of aggressive importance sampling and exact validity).
 
-### 11.3 판정에 따른 다음 단계
+### 11.3 Next steps following the verdict
 
-A fail이므로 결정 6의 규칙대로 **방향 2로 전환**: (a) 우선 query 단위 WoR + finite-population decomposition(μ_N = λ·mean(Ŷ) + bounded rectifier)에
-betting CS를 붙여 "exact certificate가 실제로 몇 라벨에서 닫히는지"를 측정(63 계열), (b) 문서 단위로는 π 하한·절단·편향 보정 추정량의 폭을
-측정. 방향 1의 결과(oracle 13%/plateau 분석)는 "design head-room이 작다"는 부정적 결과로 Limitations 또는 부록에 남긴다.
-81/82 v2 결과(Table 2 재생성, 절감률 재계산)는 84 출력(`TABLES_v0.1.md`, `J50.csv`)에 들어갔고 별도 판독이 필요.
+Since A fails, by the rule of decision 6 we **switch to direction 2**: (a) first, attach a betting CS to the query-level WoR + finite-population decomposition (μ_N = λ·mean(Ŷ) + bounded rectifier)
+and measure "at how many labels the exact certificate actually closes" (63 series); (b) at the document level, measure the width of the π-lower-bounded, truncated and bias-corrected estimators.
+The results of direction 1 (oracle 13% / plateau analysis) remain in Limitations or an appendix as the negative result "design head-room is small".
+The 81/82 v2 results (Table 2 regenerated, savings recomputed) went into the 84 outputs (`TABLES_v0.1.md`, `J50.csv`) and need a separate reading.
 
-## 12. 목표 전환 (2026-09-14 21:30 KST, 승인): Featured 확장 중단 → TMLR 게재용 원고 완성
+## 12. Change of goal (2026-09-14 21:30 KST, approved): stop the Featured extension → complete the manuscript for TMLR publication
 
-사용자 결정: Gate A 실패는 내부 투자 기준 미달이지 연구 실패가 아님. 논문은 **"AI 판정자를 이용한 검색 정책 감사에서 비용 절감은 어디서
-발생하며 어떤 조건에서 사라지는가"**에 답하는 실증·방법론 분석 논문으로 정리. 방향 2는 원고의 인증 주장을 정리하는 데 필요한 만큼만
-(범위 제한). wrong-certificate 0.000은 관측 오류율로만 보고. 절차: Table 2 판독 → 인증 방식의 제한된 비교 → 주장·원고 재작성 → 제출 전 검증.
+User decision: the Gate A failure is a miss on the internal investment criterion, not a research failure. The paper is organised as an empirical and methodological analysis answering
+**"in auditing retrieval policies with AI judges, where do the cost savings arise and under what conditions do they disappear"**. Direction 2 only to the extent needed to settle the manuscript's certification claims
+(scope limited). Wrong-certificate 0.000 is reported only as an observed error rate. Procedure: read Table 2 → limited comparison of certification methods → rewrite claims and manuscript → verification before submission.
 
-### 12.1 Table 2 재판독 — 정직 accounting(shared ledger + pilot 100%), t bound, 300 draws, J50 = 고유 인간 라벨 수(pilot 포함)
+### 12.1 Re-reading of Table 2 — honest accounting (shared ledger + pilot 100%), t bound, 300 draws, J50 = number of unique human labels (pilot included)
 
-예산 격자를 보강해(antique 5–150q, dl212223 5–90q, cast19 30–200q, dbpedia 20–150q) 검열을 제거함. 파일: `*_v2_shared_full_t.csv` + `*_grid2_*`.
+The budget grid was extended (antique 5–150q, dl212223 5–90q, cast19 30–200q, dbpedia 20–150q) to remove censoring. Files: `*_v2_shared_full_t.csv` + `*_grid2_*`.
 
-**eps = 0.02** (원고 Table 2와 같은 설정):
+**eps = 0.02** (same setting as manuscript Table 2):
 
 | method | antique/Qwen | antique/rr | antique/inv | cast19/Qwen | cast19/rr | cast19/inv | dbpedia/Qwen | dbpedia/rr | dl212223/Qwen |
 |---|---|---|---|---|---|---|---|---|---|
@@ -319,146 +318,146 @@ betting CS를 붙여 "exact certificate가 실제로 몇 라벨에서 닫히는�
 | AI robust mixture (0.3) + CV | 780 | 815 | 949 | 3306 | 3324 | 3460 | 2125 | 2391 | 1943 |
 | decision-weight IS + judge CV (λ=1) | 797 | 822 | 947 | 3456 | 3555 | 3702 | 2271 | 2453 | 1976 |
 | decision-weight IS + judge CV (λ fitted on pilot) | 815 | 812 | 888 | 3139 | 3709 | 3766 | 2170 | 2272 | 1883 |
-| pilot labels (모든 arm 공통) | 631 | 631 | 631 | 975 | 975 | 975 | 1028 | 1028 | 1387 |
-| max wrong-certificate rate (관측) | .003 | .003 | .003 | .003 | .003 | .003 | .003 | .003 | .007 |
+| pilot labels (common to all arms) | 631 | 631 | 631 | 975 | 975 | 975 | 1028 | 1028 | 1387 |
+| max wrong-certificate rate (observed) | .003 | .003 | .003 | .003 | .003 | .003 | .003 | .003 | .007 |
 
-판독(원고에 그대로 들어갈 결론):
-1. **가중 표집의 절감은 정직 accounting에서도 유지된다** — uniform 대비 decision-weight IS: antique −46%, dl212223 −53%, dbpedia > −51%
-   (uniform은 5,461 라벨에서도 미도달), cast19 > −32%. pilot은 모든 arm에 공통이므로 이 비교를 희석하지 않는다. "halves"는 **이 행(humans-only,
-   uniform 대비)에서만** 쓸 수 있다. 분산비(accounting 무관) uniform/weighted = 2.6–4.3×, 원고의 2.9–4.4×와 일치.
-2. **판정자의 추가 이득은 작아졌고 조건부다** — decision-weight IS 대비 최선의 judge arm: antique −11%(Qwen), −7%(rr); cast19 −19%(Qwen, λ-fitted)
-   / −15%(rr, robust); dbpedia −19%(Qwen) / −11%(rr); dl212223 −8%(Qwen, ρ≈0.46). 원고의 "−21% / −14%"는 legacy accounting(pilot 일부 과금)의
-   수치이며 정직 과금에서는 **−7 ~ −19%**로 낮춰야 한다. pilot을 뺀 표집 라벨 기준으로는 dbpedia/Qwen −25%.
-3. **판정자가 손해를 주는 조건이 실측된다** — 반전(adversarial) 판정자 + λ=1 CV: antique +8%, cast19 −5%(잡음 수준), dbpedia는 rr/inv 미실행.
-   calibrated-judge 규칙은 최악(antique/inv +59%, dl212223 +13%) — "판정자가 확신하며 틀리는 문서"에 라벨을 안 주는 실패 모드. λ를 pilot에서
-   맞추면(cvl) 반전 판정자 손해가 +1%로 사라진다(antique 888 vs 877).
-4. **강한 baseline(stratified, residual-estimated active) 대비 우월성 주장은 없다** — humans-only stratified ≈ decision-weight(±5%),
-   judge arms 간 차이는 ±5% 안(300 draws에서 J50 잡음 ≈ ±3–5%). 원고는 "방법 우월성"이 아니라 "이득이 생기는 조건(ρ, 비용 구조, pilot 비중)"을
-   설명하는 방향으로 다시 쓴다.
-5. eps=0.01에서는 cast19·dbpedia가 5,400 라벨까지도 50% 미도달(ACT 0.29 / 0.49) — 표에는 eps=0.02를 주 결과로, eps=0.01은 도달한 셀만.
+Reading (conclusions that go into the manuscript as is):
+1. **The saving from weighted sampling survives under honest accounting** — decision-weight IS vs uniform: antique −46%, dl212223 −53%, dbpedia > −51%
+   (uniform not reached even at 5,461 labels), cast19 > −32%. The pilot is common to all arms, so it does not dilute this comparison. "halves" may be used **only for this row (humans-only,
+   vs uniform)**. Variance ratio (independent of accounting) uniform/weighted = 2.6–4.3×, consistent with the manuscript's 2.9–4.4×.
+2. **The judge's additional gain has become smaller and is conditional** — best judge arm vs decision-weight IS: antique −11% (Qwen), −7% (rr); cast19 −19% (Qwen, λ-fitted)
+   / −15% (rr, robust); dbpedia −19% (Qwen) / −11% (rr); dl212223 −8% (Qwen, ρ≈0.46). The manuscript's "−21% / −14%" are figures under legacy accounting (pilot partially charged)
+   and must be lowered to **−7 to −19%** under honest charging. On sampled labels excluding the pilot, dbpedia/Qwen −25%.
+3. **The conditions under which the judge hurts are measured** — inverted (adversarial) judge + λ=1 CV: antique +8%, cast19 −5% (noise level); dbpedia rr/inv not run.
+   The calibrated-judge rule is the worst (antique/inv +59%, dl212223 +13%) — the failure mode of not labelling "documents where the judge is confidently wrong". Fitting λ on the pilot
+   (cvl) removes the inverted-judge loss to +1% (antique 888 vs 877).
+4. **No claim of superiority over strong baselines (stratified, residual-estimated active)** — humans-only stratified ≈ decision-weight (±5%),
+   differences among judge arms are within ±5% (J50 noise at 300 draws ≈ ±3–5%). The manuscript is rewritten to explain "the conditions under which the gain arises (ρ, cost structure, pilot share)"
+   rather than "method superiority".
+5. At eps=0.01, cast19 and dbpedia do not reach 50% even at 5,400 labels (ACT 0.29 / 0.49) — the table uses eps=0.02 as the main result, and eps=0.01 only for the cells that are reached.
 
-### 12.2 Gate A 부록 정리 — 분산 목적함수 개선 ≠ 인증 비용 개선
+### 12.2 Gate A appendix write-up — improving the variance objective ≠ improving certification cost
 
-§11의 결과는 "현재 메뉴·데이터에서는 정교한 배분 최적화가 전체 인증 비용을 크게 줄이지 못한다"는 부정적 결과로 부록에 남긴다.
-설계 목적함수 max_j V_j/s_j²는 oracle이 1.5–2.5× 좋지만 J50 절감은 0–13%. plateau 분해(§12.3)로 원인을 나눔.
+The results of §11 remain in an appendix as the negative result "with the current menus and data, sophisticated allocation optimisation does not substantially reduce the total certification cost".
+On the design objective max_j V_j/s_j² the oracle is 1.5–2.5× better, but the J50 saving is 0–13%. The cause is split by the plateau decomposition (§12.3).
 
-### 12.3 Plateau 분해 (83 `_diag`: static_sum / oracle_exact / plugin_exact, 300 draws)
+### 12.3 Plateau decomposition (83 `_diag`: static_sum / oracle_exact / plugin_exact, 300 draws)
 
-draw를 **feasible**(pilot 20 query가 고른 후보의 참 regret ≤ eps — 올바른 인증서가 존재할 수 있는 경우)와 infeasible로 나눔.
+Draws are split into **feasible** (true regret of the candidate chosen by the 20-query pilot ≤ eps — the cases where a correct certificate can exist) and infeasible.
 
-| collection | feasible 비율 | ACT(전체) 최대 예산 | ACT\|feasible 최대 예산 | 저예산 oracle 이득 (ACT\|feas, static→oracle) |
+| collection | feasible fraction | ACT (overall) at max budget | ACT\|feasible at max budget | low-budget oracle gain (ACT\|feas, static→oracle) |
 |---|---|---|---|---|
 | antique | 0.80–0.89 | 0.74–0.76 | 0.88–0.90 | B=20q eps=.02: 0.62→0.71 |
 | dl212223 | 0.83–0.89 | 0.80–0.85 | 0.96 | B=20q eps=.01: 0.43→0.60; B=30q: 0.68→0.82 |
 | dbpedia-entity | 0.83–0.93 | 0.53–0.70 | 0.63–0.75 | ≈0 (±0.03) |
 | cast19 | 0.83–0.94 | 0.04–0.10 | 0.04–0.12 | ≈0 |
 
-- plateau의 대부분은 **infeasible draw**(7–20%: 20-query pilot이 잘못된 후보를 고름)다. feasible 조건부 ACT는 예산이 크면 0.88–0.97에
-  닿는다. 남은 미인증(3–12%)은 slack이 작은 경우(eps/2 미만 slack이 0–9%).
-- 배분 최적화의 이득은 **feasible한 실행에서, 저예산 구간에서만** 실재한다(dl212223 +0.14–0.17). 예산이 커지면 모든 arm이 feasible
-  ceiling에 닿아 이득이 사라진다. 인증 비용(J50)으로 환산하면 0–13%. 원고에는 "조건부 이득(진단)"과 "전체 비용(주 결과)"을 함께 보고.
-- cast19는 다른 종류의 실패: feasible 84–94%인데 ACT ≤ 0.12 — 정책 격차가 ≈0(slack ≈ eps)이라 폭 < 0.01의 인증서가 필요, 표본 부족.
-  어떤 배분도 이를 못 넘는다.
+- Most of the plateau is **infeasible draws** (7–20%: the 20-query pilot picks a wrong candidate). The feasible-conditional ACT reaches 0.88–0.97 at large budgets.
+  The remaining uncertified cases (3–12%) are those with small slack (slack below eps/2 in 0–9%).
+- The gain from allocation optimisation is real **only in feasible runs and only in the low-budget regime** (dl212223 +0.14–0.17). As the budget grows, every arm reaches the feasible
+  ceiling and the gain disappears. Converted to certification cost (J50) it is 0–13%. The manuscript reports both the "conditional gain (diagnostic)" and the "total cost (main result)".
+- cast19 is a different kind of failure: feasible 84–94% yet ACT ≤ 0.12 — the policy gap is ≈0 (slack ≈ eps), so a certificate of width < 0.01 is needed and the sample is insufficient.
+  No allocation can overcome this.
 
-### 12.4 인증 방식의 제한된 비교 (63, query 단위, population estimand, 300 repeats)
+### 12.4 Limited comparison of certification methods (63, query level, population estimand, 300 repeats)
 
-구현: `lib/certificates.py` `ucb_bet(..., N=)` = Waudby-Smith & Ramdas (2020) WoR betting CS(가설 m의 조건부 평균 m_i=(Nm−S_{i−1})/(N−i+1),
-불가능 가설 즉시 기각); 합성 검증 400회 miscoverage 0.000(목표 ≤ 0.1), n→N에서 정확 평균으로 수축. `ucb_finite_population`:
-μ_N = (Σ_train D + (N−ntr)·UCB_rest)/N — 라벨된 train half는 정확히 알고, val은 나머지 N−ntr의 WoR 표본. `63 --bound bet_wor`,
-arm `split_fp`(humans) / `split_fp_ppi`(rectifier D−λD̂, λ는 train에서만, 범위 [−1−λ, 1+λ]), `--ntr_fixed 20`(val이 모집단 전체까지 자라도록).
+Implementation: `lib/certificates.py` `ucb_bet(..., N=)` = Waudby-Smith & Ramdas (2020) WoR betting CS (conditional mean of hypothesis m, m_i=(Nm−S_{i−1})/(N−i+1),
+impossible hypotheses rejected immediately); synthetic validation over 400 runs, miscoverage 0.000 (target ≤ 0.1), shrinks to the exact mean as n→N. `ucb_finite_population`:
+μ_N = (Σ_train D + (N−ntr)·UCB_rest)/N — the labelled train half is known exactly, and val is a WoR sample of the remaining N−ntr. `63 --bound bet_wor`,
+arms `split_fp` (humans) / `split_fp_ppi` (rectifier D−λD̂, λ from train only, range [−1−λ, 1+λ]), `--ntr_fixed 20` (so that val can grow to the whole population).
 
-| collection (N) | split_t (t, 사전등록 설계) | split_fp (t + FPC + known train) | split_fp (**bet_wor**, val ≤ N−20) | split_fp_ppi (bet_wor) |
+| collection (N) | split_t (t, pre-registered design) | split_fp (t + FPC + known train) | split_fp (**bet_wor**, val ≤ N−20) | split_fp_ppi (bet_wor) |
 |---|---|---|---|---|
 | antique (200) | ACT 0.60, T̄ 126 | 0.82, T̄ 100 | **0.000** (T=150) | 0.000 |
 | cast19 (159) | 0.76, T̄ 116 | 0.98, T̄ 86 | 0.28 (T=150 → val 130 = 82% of N) | 0.04 |
 | dbpedia-entity (399) | 0.94, T̄ 137 | 0.99, T̄ 111 | 0.10 (T=350 → val 330 = 83%) | 0.007 |
 | dl212223 (211) | 0.99, T̄ 88 | 1.00, T̄ 68 | 0.07 (T=200 → val 180 = 85%) | 0.04 |
 
-관측 wrong-certificate rate: 모든 arm ≤ 0.007(t), 0(bet_wor).
+Observed wrong-certificate rate: every arm ≤ 0.007 (t), 0 (bet_wor).
 
-결론(원고에 들어갈 문장):
-- **현재 구현한 exact certificate(betting, i.i.d. 또는 WoR)는 eps=0.01, N ≤ 400에서 실용적이지 않다**: 모집단의 80% 이상을 라벨해도
-  ACT ≤ 0.28. 원인은 범위 항 R·log(1/δ)/n (R=2, δ=α/(looks·M(M−1)) ≈ 1e−3 → n=100에서 ≈0.14 ≫ eps)이지 분산이 아니다(합성:
-  σ=0.05, n=100에서 bet 폭 0.06 vs t 0.015; 격자 해상도 무관). 시간-균일 CS로 looks 보정을 없애도 log(1/δ) 7.1→4.8, 폭 15% 감소 — 결론 불변.
-  이는 **이 설정에서 이 bound가 비실용적**이라는 진술이며, 모든 exact certificate가 비효율적이라는 주장이나 새 연구 공백 입증은 아님.
-- PPI 판정자 arm은 exact bound에서 더 나쁘다(rectifier 범위 1+λ 페널티) — "판정자 이득은 점근 인증에서만 실현된다"고 명시.
-- **유한모집단 t 인증서(FPC + known train half)**는 사전등록 split_t보다 일관되게 좋다(T̄ 20–26% 감소, ACT 0.82–1.00). 단 이것은
-  **고정 평가 집합 N에 대한 보장**이며 미래 query 분포 평균 성능의 보장이 아님을 명시. 사후(post-hoc) 변형으로 보고.
-- 원고의 인증 주장: "asymptotically calibrated (t) certificate; observed wrong-certificate rate ≤ 0.007 over all runs" — 관측 오류율이며
-  보장의 증거로 쓰지 않는다. Finite-sample-exact 변형은 부록에 비용과 함께.
+Conclusions (sentences that go into the manuscript):
+- **The exact certificates implemented so far (betting, i.i.d. or WoR) are not practical at eps=0.01, N ≤ 400**: even after labelling more than 80% of the population,
+  ACT ≤ 0.28. The cause is the range term R·log(1/δ)/n (R=2, δ=α/(looks·M(M−1)) ≈ 1e−3 → ≈0.14 ≫ eps at n=100), not the variance (synthetic:
+  σ=0.05, n=100, bet width 0.06 vs t 0.015; independent of grid resolution). Removing the looks correction with a time-uniform CS reduces log(1/δ) 7.1→4.8, width by 15% — conclusion unchanged.
+  This is a statement that **this bound is impractical in this setting**, not a claim that every exact certificate is inefficient, nor a demonstration of a new research gap.
+- The PPI judge arm is worse under the exact bound (penalty from the rectifier range 1+λ) — state explicitly that "the judge gain is realised only under asymptotic certification".
+- **The finite-population t certificate (FPC + known train half)** is consistently better than the pre-registered split_t (T̄ reduced 20–26%, ACT 0.82–1.00). But state explicitly that this is
+  **a guarantee for the fixed evaluation set N**, not a guarantee of average performance over the future query distribution. Reported as a post-hoc variant.
+- The manuscript's certification claim: "asymptotically calibrated (t) certificate; observed wrong-certificate rate ≤ 0.007 over all runs" — an observed error rate,
+  not used as evidence of a guarantee. The finite-sample-exact variant goes in the appendix together with its cost.
 
-### 12.5 원고 재작성 계획 (다음 단계)
-1. Table 2 → §12.1 정직 accounting 표(eps=0.02)로 교체; 사전등록 표는 부록 "pre-registered record"로 이동.
-2. §5 "Three readings" 수치 교체(−46~−53% humans-only; 판정자 −7~−19% 조건부; 반전 판정자 +8%, λ-fit으로 제거; calibrated rule 최악).
-3. 초록·서론·기여·결론에서 "halves" → humans-only 행에만, 판정자 이득은 크기 그대로.
-4. 부록: 메뉴 배분 부정적 결과(§11, §12.3), exact certificate 비용(§12.4), 유한모집단 t 변형.
-5. Limitations: 관측 오류율, 고정 평가 집합, pilot 27–40% 비중, N ≤ 400.
+### 12.5 Manuscript rewrite plan (next steps)
+1. Table 2 → replace with the honest-accounting table of §12.1 (eps=0.02); move the pre-registered table to the appendix as the "pre-registered record".
+2. Replace the figures in §5 "Three readings" (−46 to −53% humans-only; judge −7 to −19% conditional; inverted judge +8%, removed by λ-fit; calibrated rule worst).
+3. In the abstract, introduction, contributions and conclusion, "halves" → only for the humans-only row; judge gain with its magnitude as is.
+4. Appendix: menu-allocation negative result (§11, §12.3), exact-certificate cost (§12.4), finite-population t variant.
+5. Limitations: observed error rate, fixed evaluation set, pilot share 27–40%, N ≤ 400.
 
-### 12.6 원고 수정 완료 (main.tex, 17쪽, 경고 0, `pdflatex` 3회 + bibtex)
+### 12.6 Manuscript revision complete (main.tex, 17 pages, 0 warnings, `pdflatex` 3 times + bibtex)
 
-- 초록 (ii)(iii)·기여 2·3·결론: "halves" → humans-only 가중 표집 행에만(−46~−53%, 4 collection); 판정자 −7~−19% 조건부; 반전 판정자 +8%→λ-fit +1%;
-  calibrated rule +59%; oracle 메뉴 설계 0–13%; exact bound는 모집단 85%를 라벨해도 ≤ 28%.
-- §5.3 Table 2를 정직 accounting 표(9열: ANTIQUE Q/R/I, CAsT Q/R/I, DBpedia Q/R, DL Q + pilot 행)로 교체, Figure F7_v2, "Four readings" 재작성
-  (MC 표준오차 6–9% 명시, 판정자 증분은 λ-fit CV 기준으로 통일).
-- §4: Prop. B 뒤 "What exactness costs" 단락 신설(유한모집단 estimand, FPC-t 20–26% 빠름, betting WoR 비실용, 범위 항 진단).
-- §7 (2) 메뉴 배분 부정적 결과를 oracle design + plateau 분해로 재작성.
-- §6.2/6.3의 legacy J50 인용에 "per-comparison accounting" 표기 + ANTIQUE 정직 accounting 수치 병기.
-- Limitations: 관측 오류율 ≠ 보장, 고정 평가 집합, pilot 27–40%, N=159–399.
-- 부록 신설: C "Pre-registered cost table (original accounting)"(구 Table 2 이동), D "Allocation across the comparisons of a menu"(Table 5),
-  E "Exact and finite-population certificates"(Table 6 + 합성 진단). 재현 노트에 `86_table2_v2.py` 명시.
-- 새 스크립트: `04_code/86_table2_v2.py`(TABLE2_v2_eps*.csv, TABLE2_v2.tex, F7_J50_v2.png). `82`에 `--tag`, `83`에 feasible/act_feasible/slack 열,
-  `63`에 `--bound bet_wor`, `--ntr_fixed`, arm `split_fp`/`split_fp_ppi`; `lib/certificates.py`에 `ucb_bet(N=)`, `ucb_finite_population`,
-  t의 FPC; `lib/design.py` water-filling 닫힌 해.
+- Abstract (ii)(iii), contributions 2 and 3, conclusion: "halves" → only for the humans-only weighted-sampling row (−46 to −53%, 4 collections); judge −7 to −19% conditional; inverted judge +8% → λ-fit +1%;
+  calibrated rule +59%; oracle menu design 0–13%; the exact bound ≤ 28% even after labelling 85% of the population.
+- §5.3 Table 2 replaced with the honest-accounting table (9 columns: ANTIQUE Q/R/I, CAsT Q/R/I, DBpedia Q/R, DL Q + pilot row), Figure F7_v2, "Four readings" rewritten
+  (MC standard error 6–9% stated; judge increments unified on the λ-fit CV basis).
+- §4: new "What exactness costs" paragraph after Prop. B (finite-population estimand, FPC-t 20–26% faster, betting WoR impractical, range-term diagnosis).
+- §7 (2) menu-allocation negative result rewritten with the oracle design + plateau decomposition.
+- Legacy J50 citations in §6.2/6.3 marked "per-comparison accounting" + ANTIQUE honest-accounting figures given alongside.
+- Limitations: observed error rate ≠ guarantee, fixed evaluation set, pilot 27–40%, N=159–399.
+- New appendices: C "Pre-registered cost table (original accounting)" (old Table 2 moved), D "Allocation across the comparisons of a menu" (Table 5),
+  E "Exact and finite-population certificates" (Table 6 + synthetic diagnostics). `86_table2_v2.py` stated in the reproducibility note.
+- New script: `04_code/86_table2_v2.py` (TABLE2_v2_eps*.csv, TABLE2_v2.tex, F7_J50_v2.png). `--tag` in `82`; feasible/act_feasible/slack columns in `83`;
+  `--bound bet_wor`, `--ntr_fixed`, arms `split_fp`/`split_fp_ppi` in `63`; `ucb_bet(N=)`, `ucb_finite_population` and the FPC for t in `lib/certificates.py`;
+  closed-form water-filling in `lib/design.py`.
 
-### 12.7 데이터 아카이브
-- `pools_bundle` MANIFEST.csv(53 files, 68.5 MB, sha256) + README_DATA.md(모델·버전·출처·라이선스 주의) 생성, verify 0 problems. `emb/`(2.2 GB 임베딩 캐시) 제외.
-- Hugging Face **private** dataset `<private Hugging Face dataset>` 업로드 완료(56 files). `_texts.tsv`는 원 컬렉션 라이선스를 상속하므로 private 유지.
+### 12.7 Data archive
+- `pools_bundle` MANIFEST.csv (53 files, 68.5 MB, sha256) + README_DATA.md (models, versions, sources, licence caveats) created, verify 0 problems. `emb/` (2.2 GB embedding cache) excluded.
+- Upload to the Hugging Face **private** dataset `<private Hugging Face dataset>` complete (56 files). `_texts.tsv` inherits the original collections' licences and therefore stays private.
 
-### 12.8 남은 일(제출 전)
-1. 원고 전체 통독(숫자 ↔ CSV 대조는 §12.1·부록 표에 대해 완료; §3·§6 legacy 수치는 불변).
-2. `git commit` (featured-prep) — 작업 트리 114개 변경 파일; 커밋 메시지에 §11–12 참조.
-3. 남은 판단: eps=0.01 셀(cast/dbpedia n.r.)을 표에 넣을지(현재 본문에서 문장으로만 언급).
+### 12.8 Remaining work (before submission)
+1. Full read-through of the manuscript (numbers ↔ CSV cross-check completed for §12.1 and the appendix tables; the legacy figures in §3 and §6 are unchanged).
+2. `git commit` (featured-prep) — 114 changed files in the working tree; reference §11–12 in the commit message.
+3. Remaining decision: whether to put the eps=0.01 cells (cast/dbpedia n.r.) into the table (currently mentioned only in a sentence in the body).
 
-### 12.9 저장소 이력 정리 (사용자 요청, 2026-09-14 23:05 KST)
-자동 삽입된 `Co-authored-by` trailer(Cursor / Claude)를 세 커밋 메시지에서 제거해 단일 저자로 정리. 트리·저자·날짜 불변.
-해시 변경: e0609ea→6aa813a, 978856e→d9aeef3, 9aa624e→d678bc7 (`03_data/LOCK_ARTIFACTS_e0609ea/HASH_MAP.txt`). 태그 `lock-e0609ea-2026-09-14`는
-6aa813a로 이동. 로컬 `commit-msg` hook이 이후 커밋에서도 trailer를 제거. 백업 브랜치 `backup/main-e0609ea`, `backup/featured-prep-9aa624e`는 로컬에만.
+### 12.9 Repository history clean-up (user request, 2026-09-14 23:05 KST)
+The auto-inserted `Co-authored-by` trailers (Cursor / Claude) were removed from three commit messages to leave a single author. Trees, authors and dates unchanged.
+Hash changes: e0609ea→6aa813a, 978856e→d9aeef3, 9aa624e→d678bc7 (`03_data/LOCK_ARTIFACTS_e0609ea/HASH_MAP.txt`). Tag `lock-e0609ea-2026-09-14` moved
+to 6aa813a. A local `commit-msg` hook strips the trailer from subsequent commits as well. Backup branches `backup/main-e0609ea`, `backup/featured-prep-9aa624e` exist only locally.
 
-## 13. 2차 리뷰(2026-09-14 23:18 KST) 대응 — 실행 오류·estimand 정합성 수정과 재생성
+## 13. Response to the second review (2026-09-14 23:18 KST) — fixes to execution errors and estimand consistency, and regeneration
 
-### 13.1 수정
-| 지적 | 수정 | 파일 |
+### 13.1 Fixes
+| Issue | Fix | File |
 |---|---|---|
-| `63` finite-population arm 평가가 split_t/ppi/auto 종료 시 중단 → 미평가를 `abstain`으로 기록 | 5개 split arm 중 하나라도 미종료면 계속 평가 | `63_planner_v2.py` |
-| `81/82/83`가 μ_R(pilot 제외 query 평균)을 추정하면서 μ_N(전체 모집단)으로 판정 | pilot의 D_j는 정확히 알고, 나머지 R에서 WoR로 뽑힌 query의 문서 단위 추정치에 2단계 분산 V̂=(1−f)s_b²/n + f·mean(v̂_within)/n (f=n/|R|, v̂=HT 문서표집 분산)을 씌워 UCB_N=(Σ_A D+|R|·UCB_R)/N. 합성 MC 2000회 miscoverage 0.039 (f=0.3), 0.052 (f=1), 목표 0.05 | `lib/certificates.py` (`ht_var_hat`, `ucb_two_stage`, `ucb_population_two_stage`), `81`, `82`, `83` (`--bound t`, 비-legacy에서만) |
-| `86` grid2 파일 중복 읽기 | `sorted(set(files))`; v2 수치 불변 확인. `v3` 세대(`*_v3b{budget}_*`) 지원, eps=0.01 tex도 생성 | `86_table2_v2.py` |
-| 부록 E 모집단 라벨 비율에 pilot 20 누락 | T는 pilot 포함 전체 감사 query 수로 정의, T/N 보고. 새 표 생성기 | `87_exact_table.py` |
-| 후보를 training half에서 고른다는 본문 서술 (실행은 validation) | §4 split certificate 문단·Prop. B 증명 "(as implemented)" 정정 | `main.tex` |
-| "cannot bias the bound" | 추정량의 불편성(모든 judge에서 성립)과 bound의 coverage(bound의 가정에 의존)를 분리해 서술 (초록·기여 2·결론) | `main.tex` |
-| `67` ess_gain = 추정 SE 비율 | 명칭을 "ratio of squared estimated standard errors"로 통일. MC-MSE 열은 pool이 번들에 있는 설정만 재생성 가능(legacy/modern/judged reranker); TREC DL 2019/20 pool과 covid/touché의 Qwen3-8B 판정은 번들에 없음 | `main.tex`, `05_results/ppi_gain/` |
+| `63` finite-population arm evaluation stops when split_t/ppi/auto terminate → unevaluated recorded as `abstain` | Continue evaluating while any of the 5 split arms has not terminated | `63_planner_v2.py` |
+| `81/82/83` estimate μ_R (mean over queries excluding the pilot) but decide on μ_N (whole population) | The pilot's D_j are known exactly; the document-level estimates of the queries drawn WoR from the remaining R get the two-stage variance V̂=(1−f)s_b²/n + f·mean(v̂_within)/n (f=n/|R|, v̂=HT document-sampling variance), giving UCB_N=(Σ_A D+|R|·UCB_R)/N. Synthetic MC, 2000 runs: miscoverage 0.039 (f=0.3), 0.052 (f=1), target 0.05 | `lib/certificates.py` (`ht_var_hat`, `ucb_two_stage`, `ucb_population_two_stage`), `81`, `82`, `83` (`--bound t`, non-legacy only) |
+| `86` reads grid2 files twice | `sorted(set(files))`; v2 figures confirmed unchanged. `v3` generation (`*_v3b{budget}_*`) supported; eps=0.01 tex also generated | `86_table2_v2.py` |
+| Appendix E population label fraction omits the 20 pilot queries | T defined as the total number of audited queries including the pilot; T/N reported. New table generator | `87_exact_table.py` |
+| Body text says the candidate is chosen on the training half (the runs use validation) | §4 split-certificate paragraph and Prop. B proof corrected to "(as implemented)" | `main.tex` |
+| "cannot bias the bound" | Unbiasedness of the estimator (holds for every judge) and coverage of the bound (depends on the bound's assumptions) stated separately (abstract, contribution 2, conclusion) | `main.tex` |
+| `67` ess_gain = ratio of estimated SEs | Name unified to "ratio of squared estimated standard errors". The MC-MSE column can be regenerated only for the settings whose pool is in the bundle (legacy/modern/judged reranker); the TREC DL 2019/20 pools and the Qwen3-8B judgments for covid/touché are not in the bundle | `main.tex`, `05_results/ppi_gain/` |
 
-### 13.2 재실행 (모두 300 draws, 예산별 1 프로세스, tag `_v3b{B}`)
-- `81/82`: antique {5..150}×{llm,rr,inv}, cast19 {15..200}×3, dbpedia {5..200}×{llm,rr}, dl212223 {5..90}×llm → 모든 셀 비검열(eps=0.02).
-- `83`: 4 collection, 전 arm, 동일 격자. `85_gates.py --gen v3`.
-- `63`: `--ntr_fixed 20 --truth population --looks 30 50 70 90 120 150 158 199 200 210 250 300 350 398` (마지막 look = N−1), bound t / bet_wor, 300 repeats → `planner_v2/{stack}_llm_pop_{bound}_ntr20_v3`.
+### 13.2 Re-runs (all 300 draws, one process per budget, tag `_v3b{B}`)
+- `81/82`: antique {5..150}×{llm,rr,inv}, cast19 {15..200}×3, dbpedia {5..200}×{llm,rr}, dl212223 {5..90}×llm → every cell uncensored (eps=0.02).
+- `83`: 4 collections, all arms, same grid. `85_gates.py --gen v3`.
+- `63`: `--ntr_fixed 20 --truth population --looks 30 50 70 90 120 150 158 199 200 210 250 300 350 398` (last look = N−1), bound t / bet_wor, 300 repeats → `planner_v2/{stack}_llm_pop_{bound}_ntr20_v3`.
 
-### 13.3 결과가 바뀐 곳
-**부록 E.** 게이트 수정 후 betting WoR arm은 결국 88–100% 인증하지만, ANTIQUE·CAsT(median slack≈ε)는 T/N≤0.75에서 0–2%, ≤0.9에서 3–5%, 마지막 look(T=N−1, 전수조사)에서만 발화. DBpedia(N=399)·DL(margin 큼)은 75%에서 90%/73%. 결론을 "비실용적"에서 "margin 또는 N이 크면 감당 가능, margin≈ε이면 전수조사"로 수정. FPC-t는 4 collection 모두 ACT 1.00, T̄ 20–27% 단축.
+### 13.3 Where the results changed
+**Appendix E.** After the gate fix, the betting WoR arm eventually certifies 88–100%, but on ANTIQUE and CAsT (median slack≈ε) it fires 0–2% at T/N≤0.75, 3–5% at ≤0.9, and only at the last look (T=N−1, full census). DBpedia (N=399) and DL (large margin): 90%/73% at 75%. Conclusion revised from "impractical" to "affordable when the margin or N is large; a full census when margin≈ε". FPC-t has ACT 1.00 on all 4 collections, T̄ shortened 20–27%.
 
-**Table 2 (v3).** estimand 정합화로 모든 비용이 내려갔고 CAsT가 가장 크게 움직임(weighted 3,894→2,127). humans-only 절감 40/56/54/56% (ANTIQUE/CAsT/DBpedia/DL). λ-fit Qwen3-8B 증분 8/19/20/3%; reranker 8–19%; 반전 judge 2–5%(잡음). pilot 비중(weighted J50 기준) 76/46/41/78%. pilot 제외 증분 32–35% (DL 16%). judge-assisted 4 arm 간 분산 3–11%. calibrated-judge rule: 반전 judge +40%(ANTIQUE), +29%(CAsT). eps=0.01도 uniform(CAsT·DBpedia) 외 전 셀 도달 → 부록 표 `tab:J50b`.
+**Table 2 (v3).** With the estimand made consistent, every cost went down, and CAsT moved the most (weighted 3,894→2,127). Humans-only saving 40/56/54/56% (ANTIQUE/CAsT/DBpedia/DL). λ-fit Qwen3-8B increment 8/19/20/3%; reranker 8–19%; inverted judge 2–5% (noise). Pilot share (on weighted J50) 76/46/41/78%. Increment excluding the pilot 32–35% (DL 16%). Spread among the 4 judge-assisted arms 3–11%. Calibrated-judge rule: inverted judge +40% (ANTIQUE), +29% (CAsT). At eps=0.01 every cell except uniform (CAsT, DBpedia) is also reached → appendix table `tab:J50b`.
 
-**메뉴 배분 (Gate A 재평가).** oracle 절감 2/14/0/7% (eps 0.02), 1/17/1/6% (0.01); plug-in 2/12/−13/2.5%. Gate A FAIL 유지. plateau 분해: infeasible 8–16%; ACT|feasible 최대 예산에서 ANTIQUE·CAsT·DL 0.97–1.00 (→ plateau = pilot cap), DBpedia 0.83–0.89 (잔여 분산). **CAsT는 estimand 수정 전 "인증 불가"였으나 이제 인증되며, oracle 이득이 유일하게 의미 있는(14–17%) collection.** 원고 §7(2)·부록 D를 collection별로 다시 씀.
+**Menu allocation (Gate A re-evaluated).** Oracle saving 2/14/0/7% (eps 0.02), 1/17/1/6% (0.01); plug-in 2/12/−13/2.5%. Gate A FAIL stands. Plateau decomposition: infeasible 8–16%; ACT|feasible at the maximum budget 0.97–1.00 on ANTIQUE, CAsT, DL (→ plateau = pilot cap), 0.83–0.89 on DBpedia (residual variance). **CAsT was "uncertifiable" before the estimand fix and now certifies, and it is the only collection where the oracle gain is meaningful (14–17%).** Manuscript §7(2) and Appendix D rewritten collection by collection.
 
-### 13.4 남은 것
-- `67` judged stack: 저장된 CSV의 ρ(covid 0.794, dbpedia 0.54)는 judged 3종 LODO(0.50/0.12)로도, `--train_dir legacy`(0.759/…)로도 정확히 재현되지 않음 → 원 실행 구성 미상. F4의 MC-MSE 검증은 정확히 재현되는 legacy/modern 24점 + 재실행 구성의 judged 9점으로 보고하고 구성 차이를 명시.
-- pilot × ε sweep(후보 공유, 세 측정값)은 이 커밋 이후.
+### 13.4 Remaining
+- `67` judged stack: the ρ in the stored CSV (covid 0.794, dbpedia 0.54) is reproduced exactly neither by the 3-judged LODO (0.50/0.12) nor by `--train_dir legacy` (0.759/…) → original run configuration unknown. The MC-MSE validation of F4 is reported on the 24 legacy/modern points that reproduce exactly + the 9 judged points from the re-run configuration, with the configuration difference stated.
+- The pilot × ε sweep (shared candidate, three measurements) comes after this commit.
 
-### 13.5 3차 리뷰(2026-09-15 00:45 KST) 대응
-- **같은 추출 기록으로 두 수정의 기여 분리** (`81 --tag _attr_b*`, 열 `act_iid`/`act_pilot_iid`/`act`): CAsT weighted J50 3,907 (i.i.d. t) → 2,600 (pilot 정확 반영, −33%) → 2,127 (2단계 분산+FPC, 추가 −18%); ANTIQUE 881 → 851 → 836; DL은 격자 최소 예산에서 이미 ACT≥0.5(검열). 원고 §5.3 estimand 문단에 기재.
-- **부록 E 표현 수정**: T=N−1은 전수조사가 아니라 "전수조사에 가까운 예산"; "정확한 평균을 안다" 삭제; ANTIQUE·CAsT에서 exact 인증은 실질적 라벨 절감이 거의 없다고 서술. margin 설명은 slack s=ε−Regret_N(m̂)·N·잔차분산·범위를 분리하는 고정 후보 실험이 필요한 가설로 격하.
-- **공유 구조의 두 이득 분리**: `83`의 `per_pair` arm(비교별 독립 표집, 동일 예산·동일 ledger) vs `static_sum`(재사용, 고정 배분) → 재사용 이득 ANTIQUE 43%, DBpedia 59%, DL 35%, CAsT ≥29%(per_pair n.r.). 배분 최적화 이득(static_sum vs oracle) 0–14%. 원고 §7(2)·부록 D에 "sharing pays, optimising the shared allocation pays little"로 기재. `nonoverlap`은 binding 비교(|gap| 최소)의 band와 나머지 band 합집합의 1−Jaccard이므로 인증을 막는 비교의 공유 구조를 측정함(확인).
-- **F4**: MC-MSE 검증을 재현 가능한 33 설정(BEIR 24 + judged reranker 9, 후자는 `--train_dir legacy` 구성에서 저장된 ρ와 일치)에서 수행: corr(MC gain, ρ)=0.78, 추정-SE 비율과 중앙값 차 0.03, TREC-COVID에서 추정-SE 비율이 이득을 과소평가(1.1–1.2 vs 1.5–1.7). 90% 구간 coverage 평균 0.90, 최소 0.81. 나머지 21 설정은 번들 부재로 추정-SE 비율만 보고.
-- ICML 트랙 B의 첫 실험은 위 per_pair/static/oracle 세 절차 비교의 합성 버전으로 확정(공유 정도만 조절). 실제 데이터에서 이미 첫 이득이 크고 둘째가 작다는 결과가 있으므로, 합성 실험의 역할은 "공유 구조(band overlap)가 첫 이득의 크기를 결정하는가"의 검증.
+### 13.5 Response to the third review (2026-09-15 00:45 KST)
+- **Attribution of the two fixes separated on the same draw record** (`81 --tag _attr_b*`, columns `act_iid`/`act_pilot_iid`/`act`): CAsT weighted J50 3,907 (i.i.d. t) → 2,600 (pilot accounted exactly, −33%) → 2,127 (two-stage variance + FPC, further −18%); ANTIQUE 881 → 851 → 836; DL already has ACT≥0.5 at the smallest grid budget (censored). Recorded in the estimand paragraph of manuscript §5.3.
+- **Appendix E wording fixed**: T=N−1 is not a full census but "a budget close to a full census"; "the exact mean is known" deleted; stated that on ANTIQUE and CAsT exact certification yields almost no real label saving. The margin explanation is downgraded to a hypothesis requiring a fixed-candidate experiment that separates slack s=ε−Regret_N(m̂), N, residual variance and range.
+- **The two gains of the shared structure separated**: the `per_pair` arm of `83` (independent sampling per comparison, same budget, same ledger) vs `static_sum` (reuse, fixed allocation) → reuse gain ANTIQUE 43%, DBpedia 59%, DL 35%, CAsT ≥29% (per_pair n.r.). Allocation-optimisation gain (static_sum vs oracle) 0–14%. Recorded in manuscript §7(2) and Appendix D as "sharing pays, optimising the shared allocation pays little". `nonoverlap` is 1−Jaccard between the band of the binding comparison (minimum |gap|) and the union of the remaining bands, so it measures the shared structure of the comparison that blocks certification (confirmed).
+- **F4**: MC-MSE validation performed on the 33 reproducible settings (BEIR 24 + judged reranker 9, the latter matching the stored ρ under the `--train_dir legacy` configuration): corr(MC gain, ρ)=0.78, median difference from the estimated-SE ratio 0.03, and on TREC-COVID the estimated-SE ratio underestimates the gain (1.1–1.2 vs 1.5–1.7). 90% interval coverage mean 0.90, minimum 0.81. The remaining 21 settings report only the estimated-SE ratio because the bundle is absent.
+- The first experiment of ICML track B is fixed as the synthetic version of the three-procedure comparison per_pair/static/oracle above (only the degree of sharing is varied). Since the real data already show that the first gain is large and the second small, the role of the synthetic experiment is to test "does the shared structure (band overlap) determine the size of the first gain".
 
 ## 14. Track A -- pilot sweep and fixed-candidate decomposition (2026-09-15)
 
